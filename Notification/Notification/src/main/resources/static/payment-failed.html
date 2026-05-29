@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Payment Failed - UPI Mesh</title>
+    <style>
+        body        { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+        .container  { max-width: 600px; margin: 30px auto; background: #fff;
+                      border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header     { background: #d32f2f; color: #fff; padding: 30px; text-align: center; }
+        .header h1  { margin: 0; font-size: 24px; }
+        .body       { padding: 30px; }
+        .amount-box { background: #ffebee; border-left: 5px solid #d32f2f;
+                      padding: 20px; margin: 20px 0; border-radius: 5px; text-align: center; }
+        .amount     { font-size: 36px; font-weight: bold; color: #c62828; }
+        .info-box   { background: #fff8e1; border: 1px solid #ffc107;
+                      padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .details    { background: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .detail-row { display: flex; justify-content: space-between;
+                      padding: 8px 0; border-bottom: 1px solid #eee; }
+        .detail-row:last-child { border-bottom: none; }
+        .label      { color: #666; font-size: 14px; }
+        .value      { font-weight: bold; color: #333; font-size: 14px; }
+        .footer     { background: #f4f4f4; padding: 20px; text-align: center;
+                      color: #999; font-size: 12px; }
+        .btn        { display: inline-block; background: #d32f2f; color: #fff;
+                      padding: 12px 30px; border-radius: 5px; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div style="font-size:48px; margin-bottom:10px;">❌</div>
+        <h1>Payment Failed</h1>
+        <p style="margin:5px 0; opacity:0.9;">Your payment could not be processed</p>
+    </div>
+
+    <div class="body">
+        <p>Dear <strong th:text="${senderName ?: 'User'}">User</strong>,</p>
+        <p>We're sorry, but your payment could not be completed.</p>
+
+        <div class="info-box">
+            <strong>⚠️ No money has been deducted from your account.</strong>
+            <p style="margin:5px 0; font-size:13px;">
+                If any amount was held, it will be released within 24 hours.
+            </p>
+        </div>
+
+        <div class="amount-box">
+            <div style="color:#666; font-size:14px; margin-bottom:5px;">Failed Amount</div>
+            <div class="amount">₹<span th:text="${amount}">0.00</span></div>
+        </div>
+
+        <div class="details">
+            <div class="detail-row">
+                <span class="label">Intended To</span>
+                <span class="value" th:text="${receiverUpiId}">user@upimesh</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Payment ID</span>
+                <span class="value" th:text="${paymentId}">PAY-XXXXX</span>
+            </div>
+            <div class="detail-row" th:if="${failureReason}">
+                <span class="label">Reason</span>
+                <span class="value" style="color:#d32f2f;" th:text="${failureReason}">-</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Date &amp; Time</span>
+                <span class="value" th:text="${timestamp}">-</span>
+            </div>
+        </div>
+
+        <p>You can retry the payment from the app. If the problem persists, please contact support.</p>
+
+        <center>
+            <a class="btn" href="https://app.upimesh.com">Retry Payment</a>
+        </center>
+    </div>
+
+    <div class="footer">
+        <p>This is an automated email. Please do not reply.</p>
+        <p>© 2024 UPI Payment Mesh. All rights reserved.</p>
+        <p><a href="https://upimesh.com/support" style="color:#d32f2f;">Contact Support</a></p>
+    </div>
+</div>
+</body>
+</html>

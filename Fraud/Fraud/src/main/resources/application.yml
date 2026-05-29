@@ -1,0 +1,51 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: fraud-service
+
+  cloud:
+    config:
+      enabled: false
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/upi_fraud_db}
+      database: upi_fraud_db
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.upi.fraud: DEBUG

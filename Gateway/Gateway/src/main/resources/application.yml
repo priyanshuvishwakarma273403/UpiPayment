@@ -1,0 +1,166 @@
+server:
+  port: 8080
+
+
+spring:
+  application:
+    name: api-gateway
+
+  config:
+    import: "optional:configserver:"
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  cloud:
+    gateway:
+      # Global CORS Configuration
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: false
+
+      # Service Routes - Eureka se dynamically resolve hote hain
+      routes:
+
+        # ---- AUTH SERVICE ----
+        - id: auth-service
+          uri: lb://auth-service  # lb = load balanced via Eureka
+          predicates:
+            - Path=/auth/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20   # 20 req/sec
+                redis-rate-limiter.burstCapacity: 40   # Max burst
+                redis-rate-limiter.requestedTokens: 1
+            - name: CircuitBreaker
+              args:
+                name: authServiceCB
+                fallbackUri: forward:/fallback/auth
+
+        # ---- WALLET SERVICE ----
+        - id: wallet-service
+          uri: lb://wallet-service
+          predicates:
+            - Path=/wallet/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+            - name: CircuitBreaker
+              args:
+                name: walletServiceCB
+                fallbackUri: forward:/fallback/wallet
+            - AddRequestHeader=X-Gateway-Source, upi-mesh-gateway
+
+        # ---- PAYMENT SERVICE ----
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/payment/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 30
+                redis-rate-limiter.burstCapacity: 60
+            - name: CircuitBreaker
+              args:
+                name: paymentServiceCB
+                fallbackUri: forward:/fallback/payment
+
+        # ---- TRANSACTION SERVICE ----
+        - id: transaction-service
+          uri: lb://transaction-service
+          predicates:
+            - Path=/transactions/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+
+        # ---- MERCHANT SERVICE ----
+        - id: merchant-service
+          uri: lb://merchant-service
+          predicates:
+            - Path=/merchant/**
+
+        # ---- FRAUD SERVICE ----
+        - id: fraud-service
+          uri: lb://fraud-service
+          predicates:
+            - Path=/fraud/**
+
+        # ---- AI SERVICE ----
+        - id: ai-service
+          uri: lb://ai-service
+          predicates:
+            - Path=/ai/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5   # AI calls expensive hain
+                redis-rate-limiter.burstCapacity: 10
+
+        # ---- SYNC SERVICE ----
+        - id: sync-service
+          uri: lb://sync-service
+          predicates:
+            - Path=/sync/**
+
+      # Default filters for ALL routes
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+
+# Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# JWT Config (same secret as auth-service)
+jwt:
+  secret: ${JWT_SECRET:YourSuperSecretKeyHereMustBe256BitsLongForHS256AlgorithmSecurity}
+
+# Resilience4j Circuit Breaker config
+resilience4j:
+  circuitbreaker:
+    instances:
+      authServiceCB:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 3
+      walletServiceCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.upi.gateway: DEBUG

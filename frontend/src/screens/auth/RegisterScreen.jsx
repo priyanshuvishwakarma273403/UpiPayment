@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 import { useHaptic } from '../../hooks/useHaptic';
 import authApi from '../../api/authApi';
+import { useAuthStore } from '../../store/authStore';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 

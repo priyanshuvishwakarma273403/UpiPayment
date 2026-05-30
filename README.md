@@ -13,6 +13,13 @@
 
 ---
 
+### 🎥 Project Demo Video
+<p align="center">
+  <video src="DemoVideo.mp4" width="100%" controls autoplay loop muted></video>
+</p>
+
+---
+
 ## 🔮 System Architecture
 
 The ecosystem utilizes a decentralized microservice architecture coordinated via **Netflix Eureka** for service discovery, and routed through a central **Spring Cloud Gateway**.

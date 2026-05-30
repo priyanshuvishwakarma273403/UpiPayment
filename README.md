@@ -1,6 +1,5 @@
 
 
-https://github.com/user-attachments/assets/d5dd39eb-8468-4f7e-8090-f56d46e560d6
 
 # ⚡ UPI MESH - Modern Fintech UPI Payment Ecosystem
 
@@ -19,9 +18,8 @@ https://github.com/user-attachments/assets/d5dd39eb-8468-4f7e-8090-f56d46e560d6
 
 ### 🎥 Project Demo Video
 
-[![Play Demo Video](https://img.shields.io/badge/▶_Play_Demo_Video-Click_to_Watch-0080FF?style=for-the-badge&logo=github)](https://github.com/priyanshuvishwakarma273403/UpiPayment/blob/main/DemoVideo.mp4)
 
----
+https://github.com/user-attachments/assets/d5dd39eb-8468-4f7e-8090-f56d46e560d6
 
 ## 🔮 System Architecture
 

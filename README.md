@@ -15,7 +15,7 @@
 
 ### 🎥 Project Demo Video
 
-![](https://github.com/priyanshuvishwakarma273403/UpiPayment/raw/main/DemoVideo.mp4)
+[![Play Demo Video](https://img.shields.io/badge/▶_Play_Demo_Video-Click_to_Watch-0080FF?style=for-the-badge&logo=github)](https://github.com/priyanshuvishwakarma273403/UpiPayment/blob/main/DemoVideo.mp4)
 
 ---
 

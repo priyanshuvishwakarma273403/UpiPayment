@@ -67,20 +67,8 @@ export const OtpScreen = () => {
       console.error("Verification failed:", error);
       setIsLoading(false);
       
-      // Mock bypass for developer showcase
-      const demoUser = {
-        id: 'u_mock_verify',
-        name: 'Demo Account',
-        email: 'demo@upimesh',
-        phone: phone,
-        upiId: `${phone}@upimesh`,
-        verified: true,
-        roles: ['ROLE_USER']
-      };
-      login(demoUser, 'demo_access_token', 'demo_refresh_token');
-      
-      toast.success('Mock OTP verified successfully (Demo Mode)', { id: toastId });
-      navigate('/home');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Verification failed. Please check your OTP and try again.';
+      toast.error(errorMessage, { id: toastId });
     }
   };
 

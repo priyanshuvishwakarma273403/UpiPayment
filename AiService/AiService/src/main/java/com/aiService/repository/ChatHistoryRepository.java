@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ChatHistoryRepository extends MongoRepository<ChatHistory.ChatMessage, String> {
+public interface ChatHistoryRepository extends MongoRepository<ChatHistory, String> {
     Optional<ChatHistory> findByUserIdAndSessionId(Long userId, String sessionId);
     List<ChatHistory> findByUserIdOrderByLastMessageAtDesc(Long userId);
 }

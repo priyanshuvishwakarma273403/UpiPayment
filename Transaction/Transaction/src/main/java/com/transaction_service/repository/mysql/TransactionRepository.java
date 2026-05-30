@@ -1,6 +1,6 @@
 package com.transaction_service.repository.mysql;
 
-import org.hibernate.Transaction;
+import com.transaction_service.entity.mysql.Transaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

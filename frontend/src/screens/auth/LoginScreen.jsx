@@ -65,32 +65,15 @@ export const LoginScreen = () => {
         navigate('/home');
       }
     } catch (error) {
-      console.warn("API login failed, checking local credentials database:", error);
+      console.error("API login failed:", error);
       setIsLoading(false);
-      
-      // Verify credentials against the registeredUsers store
-      const registeredUsers = useAuthStore.getState().registeredUsers || [];
-      const loginId = activeTab === 'phone' ? data.phone : data.email;
-      
-      const matched = registeredUsers.find(
-        u => (activeTab === 'phone' ? u.phone === loginId : u.email === loginId) && u.password === data.password
-      );
-
-      if (matched) {
-        login(matched, 'mock_access_token_jwt', 'mock_refresh_token_jwt');
-        toast.success(`Welcome back, ${matched.name}!`, { id: toastId });
-        navigate('/home');
-      } else {
-        toast.error('Invalid login credentials! Please register first, or use default: 9876543210 / password', { id: toastId });
-      }
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Invalid login credentials!';
+      toast.error(errorMessage, { id: toastId });
     }
   };
 
   const handleBiometric = () => {
     triggerHaptic('heavy');
-    
-    // Check if there are any registered accounts in our mock database
-    const registeredUsers = useAuthStore.getState().registeredUsers || [];
     
     // Try to load the previously authenticated user from local storage
     const savedAuth = localStorage.getItem('upimesh-auth');
@@ -104,9 +87,9 @@ export const LoginScreen = () => {
       } catch (e) {}
     }
 
-    // Prevent guest bypass: require at least one registered account or previous session
-    if (!lastUser && registeredUsers.length <= 1) {
-      toast.error('No biometric profile configured! Please register or log in with password first.');
+    // Prevent guest bypass: require a previous valid session
+    if (!lastUser) {
+      toast.error('No biometric profile configured! Please log in with password first.');
       return;
     }
 
@@ -114,9 +97,10 @@ export const LoginScreen = () => {
     
     setTimeout(() => {
       toast.dismiss();
-      const targetUser = lastUser || registeredUsers[0];
-      login(targetUser, 'mock_access_token_jwt', 'mock_refresh_token_jwt');
-      toast.success(`Biometric login successful: Welcome, ${targetUser.name}!`);
+      const token = useAuthStore.getState().token;
+      const refreshToken = useAuthStore.getState().refreshToken;
+      login(lastUser, token, refreshToken);
+      toast.success(`Biometric login successful: Welcome, ${lastUser.name}!`);
       navigate('/home');
     }, 1200);
   };

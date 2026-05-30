@@ -15,7 +15,7 @@
 
 ### 🎥 Project Demo Video
 <p align="center">
-  <video src="DemoVideo.mp4" width="100%" controls autoplay loop muted></video>
+  <video src="https://github.com/priyanshuvishwakarma273403/UpiPayment/raw/main/DemoVideo.mp4" width="100%" controls autoplay loop muted></video>
 </p>
 
 ---

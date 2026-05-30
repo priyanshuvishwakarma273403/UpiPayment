@@ -150,6 +150,15 @@ resilience4j:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+  timelimiter:
+    instances:
+      authServiceCB:
+        timeout-duration: 10s
+      walletServiceCB:
+        timeout-duration: 10s
+      paymentServiceCB:
+        timeout-duration: 10s
+
 
 management:
   endpoints:

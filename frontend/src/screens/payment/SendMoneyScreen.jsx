@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, Check, AlertCircle, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Search, Check, AlertCircle, Sparkles, AlertTriangle, ShieldCheck, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../../store/authStore';
@@ -94,6 +94,11 @@ export const SendMoneyScreen = () => {
     triggerHaptic('light');
     setRecipient(contact);
     setStep(2);
+  };
+
+  const handleQuickChip = (val) => {
+    triggerHaptic('light');
+    setAmountStr(val.toString());
   };
 
   const handleProceedToPay = () => {

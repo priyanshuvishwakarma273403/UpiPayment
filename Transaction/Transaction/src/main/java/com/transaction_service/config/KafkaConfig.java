@@ -1,6 +1,6 @@
 package com.transaction_service.config;
 
-import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

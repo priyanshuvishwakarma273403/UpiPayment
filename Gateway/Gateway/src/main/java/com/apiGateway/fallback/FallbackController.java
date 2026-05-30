@@ -32,8 +32,7 @@ import java.util.Map;
 public class FallbackController {
 
     /** Auth Service fallback */
-    @GetMapping("/auth")
-    @RequestMapping("/fallback/auth")
+    @RequestMapping("/auth")
     public Mono<ResponseEntity<Map<String, Object>>> authFallback() {
         log.warn("Auth service circuit breaker triggered - returning fallback");
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -42,7 +41,7 @@ public class FallbackController {
     }
 
     /** Wallet Service fallback */
-    @RequestMapping("/fallback/wallet")
+    @RequestMapping("/wallet")
     public Mono<ResponseEntity<Map<String, Object>>> walletFallback() {
         log.warn("Wallet service circuit breaker triggered - returning fallback");
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -51,7 +50,7 @@ public class FallbackController {
     }
 
     /** Payment Service fallback */
-    @RequestMapping("/fallback/payment")
+    @RequestMapping("/payment")
     public Mono<ResponseEntity<Map<String, Object>>> paymentFallback() {
         log.warn("Payment service circuit breaker triggered - returning fallback");
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -60,7 +59,7 @@ public class FallbackController {
     }
 
     /** Generic fallback */
-    @RequestMapping("/fallback/default")
+    @RequestMapping("/default")
     public Mono<ResponseEntity<Map<String, Object>>> defaultFallback() {
         return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(buildFallbackResponse("service",

@@ -3,6 +3,7 @@ package com.kyc_Service.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -42,6 +43,7 @@ indexes = {
         @Index(name = "idx_kyc_pan",       columnList = "pan_number"),
         @Index(name = "idx_kyc_status",    columnList = "kyc_status")
 })
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder

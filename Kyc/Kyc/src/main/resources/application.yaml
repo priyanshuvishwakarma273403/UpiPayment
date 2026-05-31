@@ -1,3 +1,131 @@
+server:
+  port: 8091
+
 spring:
   application:
-    name: Kyc
+    name: kyc-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/upi_kyc_db?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:pop99558$$}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: KycHikariPool
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/upi_kyc_docs}
+      database: upi_kyc_docs
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          min-idle: 2
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      enable-idempotence: true
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+kyc:
+  mock-mode: ${KYC_MOCK_MODE:true}
+  uidai:
+    api-url: ${UIDAI_API_URL:https://api.uidai.gov.in}
+    api-key: ${UIDAI_API_KEY:}
+    otp-expiry-minutes: 10
+    max-attempts: 3
+  nsdl:
+    api-url: ${NSDL_API_URL:https://api.nsdl.co.in}
+    api-key: ${NSDL_API_KEY:}
+  face-match:
+    api-url: ${FACE_MATCH_API_URL:https://api.hyperverge.co}
+    api-key: ${FACE_MATCH_API_KEY:appId:appKey}
+    threshold: ${FACE_MATCH_THRESHOLD:80.0}
+    provider: ${FACE_MATCH_PROVIDER:MOCK}
+  storage:
+    provider: ${STORAGE_PROVIDER:LOCAL}
+    s3-bucket: ${S3_BUCKET:upi-kyc-docs}
+    s3-region: ${S3_REGION:ap-south-1}
+  expiry-years: 10
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      uidaiService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      nsdlService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+  retry:
+    instances:
+      uidaiService:
+        maxAttempts: 3
+        waitDuration: 2s
+      nsdlService:
+        maxAttempts: 2
+        waitDuration: 1s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+logging:
+  level:
+    com.upi.kycservice: DEBUG
+    org.springframework.security: INFO
+    org.apache.kafka: WARN

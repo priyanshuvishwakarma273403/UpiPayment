@@ -1,5 +1,6 @@
 package com.kyc_Service.entity;
 
+
 public enum KycStatus {
     PENDING,
     AADHAAR_OTP_SENT,

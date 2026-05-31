@@ -5,12 +5,14 @@ import com.kyc_Service.entity.KycRecord;
 import com.kyc_Service.entity.KycStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 // kycRecord Repository - mysql
+@Repository
 public interface KycRecordRepository extends JpaRepository<KycRecord,Long> {
 
     Optional<KycRecord> findByUserId(Long userId);

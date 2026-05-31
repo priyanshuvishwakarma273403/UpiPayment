@@ -79,8 +79,8 @@ public class KycRecord {
     private LocalDateTime aadhaarVerifiedAt;
 
     // PAN details
-    @Column(name = "pan_number" , length = 10)
-    private String panNumber; // encrypted
+    @Column(name = "pan_number", length = 10)
+    private String panNumber;               // Encrypted
 
     @Column(name = "pan_verified_at")
     private LocalDateTime panVerifiedAt;

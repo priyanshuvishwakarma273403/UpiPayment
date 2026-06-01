@@ -43,5 +43,4 @@ public class RewardsKafkaConsumer {
             ack.acknowledge(); // Never block payment flow
         }
     }
-
 }

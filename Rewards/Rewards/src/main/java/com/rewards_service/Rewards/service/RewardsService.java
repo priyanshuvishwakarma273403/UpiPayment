@@ -2,6 +2,7 @@ package com.rewards_service.Rewards.service;
 
 import com.rewards_service.Rewards.entity.RewardAccount;
 import com.rewards_service.Rewards.entity.RewardTransaction;
+import com.rewards_service.Rewards.exception.RewardsException;
 import com.rewards_service.Rewards.repository.RewardAccountRepository;
 import com.rewards_service.Rewards.repository.RewardTransactionRepository;
 import lombok.RequiredArgsConstructor;

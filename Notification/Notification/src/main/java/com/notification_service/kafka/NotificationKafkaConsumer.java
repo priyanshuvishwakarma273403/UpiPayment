@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.notification_service.dto.NotificationDto;
 import com.notification_service.service.EmailNotificationService;
 import com.notification_service.service.SmsNotificationService;
+import com.notification_service.service.AuthServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -29,6 +30,7 @@ public class NotificationKafkaConsumer {
     private final EmailNotificationService emailService;
     private final SmsNotificationService smsService;
     private final ObjectMapper objectMapper;
+    private final AuthServiceClient authServiceClient;
 
     @KafkaListener(topics = "payment_completed", groupId = "notification-completed-group",
     containerFactory = "kafkaListenerContainerFactory")
@@ -65,6 +67,8 @@ public class NotificationKafkaConsumer {
         }
     }
 
+    @KafkaListener(topics = "sync_completed", groupId = "notification-sync-group",
+    containerFactory = "kafkaListenerContainerFactory")
     public void handleSyncComplete(String message,
                                    @Header(KafkaHeaders.OFFSET) long offset, Acknowledgment ack){
         try{
@@ -83,7 +87,7 @@ public class NotificationKafkaConsumer {
 
     private NotificationDto parseEvent(String message) throws Exception{
         Map<String , Object> ev = objectMapper.readValue(message, Map.class);
-        return NotificationDto.builder()
+        NotificationDto dto = NotificationDto.builder()
                 .paymentId(  str(ev,"paymentId"))
                 .senderId(   lng(ev,"senderId"))
                 .receiverId( lng(ev,"receiverId"))
@@ -102,6 +106,38 @@ public class NotificationKafkaConsumer {
                 .receiverName(str(ev,"receiverName"))
                 .timestamp(LocalDateTime.now())
                 .build();
+
+        // Enrich sender details if missing
+        if (dto.getSenderEmail() == null || dto.getSenderEmail().isBlank()) {
+            Map<String, Object> senderDetails = null;
+            if (dto.getSenderId() != null) {
+                senderDetails = authServiceClient.getUserDetails(dto.getSenderId());
+            } else if (dto.getSenderUpiId() != null) {
+                senderDetails = authServiceClient.getUserDetailsByUpiId(dto.getSenderUpiId());
+            }
+            if (senderDetails != null) {
+                dto.setSenderEmail(str(senderDetails, "email"));
+                dto.setSenderName(str(senderDetails, "fullName"));
+                dto.setSenderPhone(str(senderDetails, "phoneNumber"));
+            }
+        }
+
+        // Enrich receiver details if missing
+        if (dto.getReceiverEmail() == null || dto.getReceiverEmail().isBlank()) {
+            Map<String, Object> receiverDetails = null;
+            if (dto.getReceiverId() != null && dto.getReceiverId() != -1L) {
+                receiverDetails = authServiceClient.getUserDetails(dto.getReceiverId());
+            } else if (dto.getReceiverUpiId() != null) {
+                receiverDetails = authServiceClient.getUserDetailsByUpiId(dto.getReceiverUpiId());
+            }
+            if (receiverDetails != null) {
+                dto.setReceiverEmail(str(receiverDetails, "email"));
+                dto.setReceiverName(str(receiverDetails, "fullName"));
+                dto.setReceiverPhone(str(receiverDetails, "phoneNumber"));
+            }
+        }
+
+        return dto;
     }
 
     private String     str(Map<String,Object> m, String k) { Object v=m.get(k); return v!=null?v.toString():null; }

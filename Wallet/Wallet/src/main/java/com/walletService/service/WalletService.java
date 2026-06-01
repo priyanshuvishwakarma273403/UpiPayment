@@ -80,7 +80,7 @@ public class WalletService {
      * Money add karo (bank se top-up)
      */
     @Transactional
-    @CacheEvict(value = "wallet-service", key = "#userId" ) // cache clear karo
+    @CacheEvict(value = "wallet-balance", key = "#userId" ) // cache clear karo
     public Wallet addMoney(Long userId, BigDecimal amount , String reference){
         if(amount.compareTo(BigDecimal.ZERO) <= 0){
             throw new WalletException("Amount must be greater than zero");

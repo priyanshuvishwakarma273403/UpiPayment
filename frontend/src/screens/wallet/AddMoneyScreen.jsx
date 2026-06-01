@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, ArrowLeft, ArrowUpRight, HelpCircle, Check } from 'lucide-react';
+import { Landmark, ArrowLeft, ArrowUpRight, HelpCircle, Check, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../../store/authStore';

@@ -119,6 +119,4 @@ public class UpiTransaction {
     // When transaction was completed (success or fail)
     private LocalDateTime completedAt;
 
-
-
 }

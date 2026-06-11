@@ -1,3 +1,111 @@
+server:
+  port: 8090
+
 spring:
   application:
-    name: NPCI
+    name: npci-integration-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/npci_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: pop99558$$
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      org.quartz.threadPool.threadCount: 5
+
+# Eureka registration
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# NPCI Mock/Real config
+npci:
+  base-url: https://api.npci.org.in/upi/v2    # Real NPCI endpoint (use mock for dev)
+  mock-url: http://localhost:9090/mock-npci    # Local mock server URL
+  use-mock: true                               # Set false in production
+  timeout-ms: 10000
+  api-key: YOUR_NPCI_API_KEY
+  merchant-id: UPIMESH001
+  tls:
+    keystore-path: classpath:certs/npci-keystore.p12
+    keystore-password: changeit
+    truststore-path: classpath:certs/npci-truststore.p12
+    truststore-password: changeit
+
+# Resilience4j circuit breaker config for NPCI calls
+resilience4j:
+  circuitbreaker:
+    instances:
+      npciService:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      npciService:
+        max-attempts: 3
+        wait-duration: 2s
+        retry-exceptions:
+          - java.net.ConnectException
+          - java.util.concurrent.TimeoutException
+
+# Transaction limits (RBI compliant)
+transaction:
+  limits:
+    per-transaction-max: 100000      # ₹1 lakh per transaction (UPI limit)
+    daily-max: 200000                # ₹2 lakh daily limit
+    mandate-max: 1500000             # ₹15 lakh mandate max (eNACH)
+
+# Feign clients config
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 10000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.upimesh.npci: DEBUG
+    org.springframework.web: INFO

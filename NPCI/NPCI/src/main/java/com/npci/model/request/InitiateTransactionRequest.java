@@ -2,6 +2,7 @@ package com.npci.model.request;
 
 import com.npci.model.enums.TransactionType;
 import jakarta.validation.constraints.*;
+import lombok.Data;
 
 import java.math.BigDecimal;
 
@@ -9,6 +10,7 @@ import java.math.BigDecimal;
  * Request body for POST /npci/initiate-transaction
  * This is what Payment Service sends us when user clicks "Pay"
  */
+@Data
 public class InitiateTransactionRequest {
 
     @NotBlank(message = "Sender UPI ID is required")

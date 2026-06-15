@@ -1,3 +1,137 @@
+server:
+  port: 8091
+
 spring:
   application:
-    name: BankGateway
+    name: bank-gateway-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/bank_gateway_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: pop99558$$
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 3000ms
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=100000,expireAfterWrite=24h   # IFSC data cached for 24h
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# ─── Per-Bank API credentials ──────────────────────────────────────────────────
+# In production: load from HashiCorp Vault / AWS Secrets Manager
+banks:
+  hdfc:
+    base-url: https://api.hdfcbank.com/upi/v2
+    mock-url: http://localhost:9091/mock/hdfc
+    api-key: HDFC_API_KEY_HERE
+    client-id: UPIMESH_HDFC_CLIENT
+    use-mock: true
+    timeout-ms: 8000
+    ifsc-prefix: HDFC
+
+  sbi:
+    base-url: https://api.sbi.co.in/upi/v2
+    mock-url: http://localhost:9091/mock/sbi
+    api-key: SBI_API_KEY_HERE
+    client-id: UPIMESH_SBI_CLIENT
+    use-mock: true
+    timeout-ms: 10000
+    ifsc-prefix: SBIN
+
+  icici:
+    base-url: https://api.icicibank.com/upi/v2
+    mock-url: http://localhost:9091/mock/icici
+    api-key: ICICI_API_KEY_HERE
+    client-id: UPIMESH_ICICI_CLIENT
+    use-mock: true
+    timeout-ms: 8000
+    ifsc-prefix: ICIC
+
+  axis:
+    base-url: https://api.axisbank.com/upi/v2
+    mock-url: http://localhost:9091/mock/axis
+    api-key: AXIS_API_KEY_HERE
+    client-id: UPIMESH_AXIS_CLIENT
+    use-mock: true
+    timeout-ms: 8000
+    ifsc-prefix: UTIB
+
+  kotak:
+    base-url: https://api.kotak.com/upi/v2
+    mock-url: http://localhost:9091/mock/kotak
+    api-key: KOTAK_API_KEY_HERE
+    client-id: UPIMESH_KOTAK_CLIENT
+    use-mock: true
+    timeout-ms: 8000
+    ifsc-prefix: KKBK
+
+# IFSC API — external service for branch lookups
+ifsc:
+  api-url: https://ifsc.razorpay.com    # Free IFSC lookup API (Razorpay hosts it)
+  cache-ttl-hours: 24
+
+# Balance check cache TTL
+balance:
+  cache-ttl-seconds: 30     # Balance cached for 30 seconds (near real-time)
+
+# Resilience4j — one circuit breaker per bank
+resilience4j:
+  circuitbreaker:
+    instances:
+      hdfcBank:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+      sbiBank:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+      iciciBank:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+      axisBank:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+  retry:
+    instances:
+      bankDefault:
+        max-attempts: 2
+        wait-duration: 1s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.upimesh.bankgateway: DEBUG

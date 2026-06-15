@@ -81,5 +81,64 @@ public class EncryptionUtil {
         }
     }
 
+    /**
+     * Decrypt an encrypted value.
+     * Input must start with "ENC:" prefix.
+     */
+    public static String decrypt(String encryptedValue){
+        if(encryptedValue == null) return null;
+        if(!encryptedValue.startsWith(KEY_PREFIX)){
+            return encryptedValue;
+        }
+
+        try{
+            byte[] combined = Base64.getDecoder().decode(encryptedValue.substring(KEY_PREFIX.length()));
+            // Extract IV (first 12 bytes) and ciphertext (rest)
+            ByteBuffer buffer = ByteBuffer.wrap(combined);
+            byte[] iv = new byte[GCM_IV_BYTES];
+            buffer.get(iv);
+            byte[] ciphertext = new byte[buffer.remaining()];
+            buffer.get(ciphertext);
+
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.DECRYPT_MODE, DEV_SECRET_KEY,
+                    new GCMParameterSpec(GCM_TAG_BITS, iv));
+
+            return new String(cipher.doFinal(ciphertext));
+        }catch (Exception e){
+            log.error("Decryption failed", e);
+            throw new RuntimeException("Decryption failed — data may be corrupted", e);
+        }
+    }
+
+    /**
+     * Check if a value is already encrypted.
+     */
+    public static boolean isEncrypted(String value) {
+        return value != null && value.startsWith(KEY_PREFIX);
+    }
+
+    /**
+     * Mask a value for safe logging (never log sensitive data raw).
+     * "1234567890" → "123****890"
+     */
+    public static String maskForLog(String value) {
+        if (value == null || value.length() <= 6) return "****";
+        return value.substring(0, 3) + "****" + value.substring(value.length() - 3);
+    }
+
+    /**
+     * Hash MPIN with SHA-256 + salt (one-way — cannot reverse).
+     * Used to compare MPIN without storing original.
+     */
+    public static String hashMpin(String mpin, String salt) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest((salt + mpin).getBytes());
+            return Base64.getEncoder().encodeToString(hashBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("MPIN hashing failed", e);
+        }
+    }
 
 }

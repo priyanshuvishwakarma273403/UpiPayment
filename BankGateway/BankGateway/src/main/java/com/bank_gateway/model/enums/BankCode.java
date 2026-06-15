@@ -1,9 +1,14 @@
 package com.bank_gateway.model.enums;
+
+
 /**
  * BankCode — Supported banks in the gateway.
  * Maps to IFSC prefix and specific bank client.
  */
+
+
 public enum BankCode {
+
     HDFC("HDFC", "HDFC Bank"),
     SBI("SBIN", "State Bank of India"),
     ICICI("ICIC", "ICICI Bank"),

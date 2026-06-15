@@ -16,7 +16,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 
 /**
@@ -95,7 +94,7 @@ public class SecurityConfig {
             String serviceKey = request.getHeader("X-Internal-Service-Key");
 
             if (serviceKey == null || !serviceKey.equals(expectedKey)) {
-                log.warn("🚫 Unauthorized request to NPCI service | path={} | ip={}",
+                log.warn(" Unauthorized request to NPCI service | path={} | ip={}",
                         path, request.getRemoteAddr());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
@@ -106,7 +105,7 @@ public class SecurityConfig {
             }
 
             // Log all incoming requests to NPCI service
-            log.info("➡️  NPCI request | method={} | path={} | ip={}",
+            log.info(" NPCI request | method={} | path={} | ip={}",
                     request.getMethod(), path, request.getRemoteAddr());
 
             filterChain.doFilter(request, response);

@@ -1,6 +1,3 @@
-
-
-
 # ⚡ UPI MESH - Modern Fintech UPI Payment Ecosystem
 
 [![Java 17](https://img.shields.io/badge/Java-17-orange.svg?style=for-the-badge&logo=java)](https://www.oracle.com/java/)
@@ -9,7 +6,7 @@
 [![React](https://img.shields.io/badge/React-18.x-61DAFB.svg?style=for-the-badge&logo=react)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-646CFF.svg?style=for-the-badge&logo=vite)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC.svg?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![Redis](https://img.shields.io/badge/Redis-6.x-DC382D.svg?style=for-the-badge&logo=redis)](https://redis.io/)
+[![Redis](https://img.shields.io/badge/Redis-7.x-DC382D.svg?style=for-the-badge&logo=redis)](https://redis.io/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.x-4479A1.svg?style=for-the-badge&logo=mysql)](https://www.mysql.com/)
 
 **UPI Mesh** is a state-of-the-art, microservices-driven digital wallet and UPI payment network. Built with a robust **Spring Boot & Spring Cloud** backend and a premium, responsive **React + Tailwind** frontend, the platform replicates real-world fintech transaction processing pipelines, secure auth workflows, fraud prevention networks, and AI-enabled financial assistants.
@@ -17,7 +14,6 @@
 ---
 
 ### 🎥 Project Demo Video
-
 
 https://github.com/user-attachments/assets/d5dd39eb-8468-4f7e-8090-f56d46e560d6
 
@@ -31,19 +27,26 @@ graph TD
     Gateway <--> |Service Discovery| Eureka[🧭 Eureka Registry - Port 8761]
     
     Gateway --> |Route /auth/**| AuthService[🔐 Auth Service - Port 8081]
-    Gateway --> |Route /wallet/**| WalletService[💼 Wallet Service]
-    Gateway --> |Route /payment/**| PaymentService[💸 Payment Service]
-    Gateway --> |Route /transactions/**| TxnService[📊 Transaction Service]
-    Gateway --> |Route /merchant/**| MerchantService[🏪 Merchant Service]
-    Gateway --> |Route /fraud/**| FraudService[🛡️ Fraud Service]
-    Gateway --> |Route /ai/**| AiService[🤖 AI Service]
-    Gateway --> |Route /sync/**| SyncService[🔄 Sync Service]
+    Gateway --> |Route /wallet/**| WalletService[💼 Wallet Service - Port 8082]
+    Gateway --> |Route /payment/**| PaymentService[💸 Payment Service - Port 8083]
+    Gateway --> |Route /transactions/**| TxnService[📊 Transaction Service - Port 8084]
+    Gateway --> |Route /merchant/**| MerchantService[🏪 Merchant Service - Port 8085]
+    Gateway --> |Route /fraud/**| FraudService[🛡️ Fraud Service - Port 8086]
+    Gateway --> |Route /ai/**| AiService[🤖 AI Service - Port 8087]
+    Gateway --> |Route /sync/**| SyncService[🔄 Sync Service - Port 8088]
+    Gateway --> |Route /bank-gateway/**| BankGatewayService[🏦 Bank Gateway - Port 8091]
+    Gateway --> |Route /settlement/**| SettlementService[💰 Settlement Service - Port 8092]
+    Gateway --> |Route /reconciliation/**| RecService[📊 Reconciliation - Port 8093]
+    Gateway --> |Route /kyc/**| KycService[🆔 KYC Service - Port 8094]
+    Gateway --> |Route /aml/**| AmlService[🕵️ AML Service - Port 8095]
     
-    AuthService <--> Redis[(🔴 Redis - OTP & Attempt Cache)]
+    AuthService <--> Redis1[(🔴 Redis - OTP & Attempt Cache)]
     AuthService <--> DB_Auth[(🐬 MySQL - Auth DB)]
     WalletService <--> DB_Wallet[(🐬 MySQL - Wallet DB)]
     PaymentService <--> DB_Payment[(🐬 MySQL - Payment DB)]
     TxnService <--> DB_Txn[(🐬 MySQL - Txn DB)]
+    KycService <--> Redis2[(🔴 Redis - OTP Cache)]
+    AmlService <--> Redis3[(🔴 Redis - Velocity Checks)]
     
     NotificationService[✉️ Notification Service] <-- Async Alerts --> Gateway
 ```
@@ -54,25 +57,29 @@ graph TD
 
 ### 🔐 1. Bulletproof Authentication & OTP Pipeline
 * **Dual Identifiers**: Support for logging in/registering via Email or 10-digit Indian Mobile Numbers.
-* **OTP Verification**: Multi-factor authentication via secure, 6-digit OTP codes backed by **Redis** caching with a 5-minute TTL.
+* **OTP Verification**: Multi-factor authentication via secure, 6-digit OTP codes backed by **Redis** caching.
 * **Brute-Force Rate Limiting**: Limit of 3 OTP requests per 15 minutes per phone number to prevent spam and credential stuffing.
-* **JWT Security & Refresh Rotation**: Stateless access token validations with a robust JWT refresh token rotation mechanism for seamless auto-logins.
+* **JWT Security & Refresh Rotation**: Stateless access token validations with a robust JWT refresh token rotation mechanism.
 
 ### 💼 2. Interactive Wallet & Payments
 * **Instantly Assigned UPI ID**: Every user receives a standardized `<phone>@upimesh` handle upon successful sign-up.
 * **Wallet-to-Wallet Money Transfers**: Instant money transfers utilizing cryptographic transaction flows.
 * **Merchant Ecosystem**: Support for registering merchant profiles, scanning static/dynamic QR codes, and executing merchant payments.
 
-### 🛡️ 3. Fraud Monitoring & Limits
-* Real-time transaction filtering to prevent anomalous behavior.
-* Daily payment limits and instant transaction flags handled through the dedicated **Fraud Service**.
+### 🆔 3. Multi-Level KYC Verification (RBI Compliance)
+* **Level 0 (Initiation)**: Phone + OTP verification (limit: ₹10,000/month).
+* **Level 1 (Basic)**: PAN verification + Aadhaar OTP via UIDAI integration (limit: ₹1,00,000/month).
+* **Level 2 (Full)**: Face Match (selfie vs document photo) to unlock unlimited transaction limits.
+* **Cryptography**: Sensitive document numbers (Aadhaar/PAN) are encrypted using secure **AES-256-GCM** keys.
 
-### 🤖 4. AI-Powered Assistant
-* Get AI-driven reviews of transaction histories, smart tips, and budgeting answers right inside the dashboard.
+### 🕵️ 4. Anti-Money Laundering & Fraud Screening (PMLA 2002)
+* **Velocity Rules**: Real-time counter checks using Redis to block users exceeding hourly/daily transaction frequencies.
+* **Structuring Detection**: Scans the last 24h transactions to detect splitting behaviors (e.g. sending multiple ₹9,999 transactions to avoid the ₹10,000 alert threshold).
+* **Fuzzy Watchlist Screening**: Performs Levenshtein name matching ($\ge$ 80% similarity) against OFAC, UN, and Politically Exposed Persons (PEPs) watchlists.
 
-### 📱 5. Rich, Dynamic UI (Mobile-First)
-* Premium dark-theme glassmorphic styling utilizing Tailwind CSS.
-* Subtle micro-animations, loading spinners, state validations, and haptic feedback wrappers to mimic native mobile application quality.
+### 💰 5. End-of-Day Settlement & Reconciliation Reports
+* **Automatic Settlements**: Executes daily batch processes using **Quartz Schedulers** to group successful merchant transactions and initiate mock NEFT/RTGS/IMPS transfers.
+* **RBI Audits & Recon Engine**: Compares internal transaction logs against bank statements to generate reconciliation reports and flag discrepancies (amount mismatches, duplicate debits, missing entries) exported to Excel formats.
 
 ---
 
@@ -91,6 +98,11 @@ graph TD
 | **AiService** | `8087` | Spring Boot, AI Models | Natural Language processing for transaction analysis and tips. |
 | **Sync** | `8088` | Spring Boot, Apache Kafka / RabbitMQ | Distributed data synchronization across datastores. |
 | **Notification**| `8089` | Spring Boot, SMTP / SMS Gateway | Dispatching OTP SMS notifications and emails. |
+| **BankGateway**| `8091` | Spring Boot, Feign, Resilience4j | Strategy Pattern interface connecting with Indian banks (HDFC, SBI, ICICI, etc.). |
+| **Settlement** | `8092` | Spring Boot, JPA, Quartz Scheduler | Batch settlements for merchants grouped by account configurations. |
+| **Reconciliation**| `8093` | Spring Boot, Apache POI, Quartz | EOD audit checks matching system ledger values with bank statements. |
+| **KycService** | `8094` | Spring Boot, WebFlux, Redis, AES-GCM | UIDAI/NSDL identity validations and limit updates. |
+| **AmlService** | `8095` | Spring Boot, Redis, MySQL, Levenshtein | Money laundering checks: velocity limits, structuring, PEP watchlists. |
 | **Frontend** | `5173` | Vite, React 18, Tailwind, Zustand, Axios | Mobile-first premium user dashboard. |
 
 ---
@@ -122,7 +134,7 @@ Run the core services in the following recommended order (ensure Eureka and Gate
    cd Auth/Auth
    ./mvnw spring-boot:run
    ```
-4. **Start Wallet, Payment, and other services** in their respective directories using:
+4. **Start the remaining business services** (Wallet, Payment, KycService, AmlService, etc.) in their respective directories using:
    ```bash
    ./mvnw spring-boot:run
    ```

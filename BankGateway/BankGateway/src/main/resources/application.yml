@@ -28,7 +28,7 @@ spring:
   cache:
     type: caffeine
     caffeine:
-      spec: maximumSize=100000,expireAfterWrite=24h   # IFSC data cached for 24h
+      spec: maximumSize=100000,expireAfterWrite=24h
 
 eureka:
   client:
@@ -40,8 +40,7 @@ eureka:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}
 
-# ─── Per-Bank API credentials ──────────────────────────────────────────────────
-# In production: load from HashiCorp Vault / AWS Secrets Manager
+# Per-bank API credentials
 banks:
   hdfc:
     base-url: https://api.hdfcbank.com/upi/v2
@@ -50,8 +49,6 @@ banks:
     client-id: UPIMESH_HDFC_CLIENT
     use-mock: true
     timeout-ms: 8000
-    ifsc-prefix: HDFC
-
   sbi:
     base-url: https://api.sbi.co.in/upi/v2
     mock-url: http://localhost:9091/mock/sbi
@@ -59,8 +56,6 @@ banks:
     client-id: UPIMESH_SBI_CLIENT
     use-mock: true
     timeout-ms: 10000
-    ifsc-prefix: SBIN
-
   icici:
     base-url: https://api.icicibank.com/upi/v2
     mock-url: http://localhost:9091/mock/icici
@@ -68,8 +63,6 @@ banks:
     client-id: UPIMESH_ICICI_CLIENT
     use-mock: true
     timeout-ms: 8000
-    ifsc-prefix: ICIC
-
   axis:
     base-url: https://api.axisbank.com/upi/v2
     mock-url: http://localhost:9091/mock/axis
@@ -77,8 +70,6 @@ banks:
     client-id: UPIMESH_AXIS_CLIENT
     use-mock: true
     timeout-ms: 8000
-    ifsc-prefix: UTIB
-
   kotak:
     base-url: https://api.kotak.com/upi/v2
     mock-url: http://localhost:9091/mock/kotak
@@ -86,18 +77,16 @@ banks:
     client-id: UPIMESH_KOTAK_CLIENT
     use-mock: true
     timeout-ms: 8000
-    ifsc-prefix: KKBK
 
-# IFSC API — external service for branch lookups
 ifsc:
-  api-url: https://ifsc.razorpay.com    # Free IFSC lookup API (Razorpay hosts it)
-  cache-ttl-hours: 24
+  api-url: https://ifsc.razorpay.com
 
-# Balance check cache TTL
 balance:
-  cache-ttl-seconds: 30     # Balance cached for 30 seconds (near real-time)
+  cache-ttl-seconds: 30
 
-# Resilience4j — one circuit breaker per bank
+internal:
+  service-key: internal-secret-change-in-prod
+
 resilience4j:
   circuitbreaker:
     instances:
@@ -114,6 +103,10 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 60s
       axisBank:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+      kotakBank:
         sliding-window-size: 10
         failure-rate-threshold: 50
         wait-duration-in-open-state: 60s

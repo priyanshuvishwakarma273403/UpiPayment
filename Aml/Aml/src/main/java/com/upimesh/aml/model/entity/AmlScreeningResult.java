@@ -45,6 +45,9 @@ public class AmlScreeningResult {
     @Column(nullable = false)
     private double riskScore;
 
+    @Column(nullable = false, precision = 18, scale = 2)
+    private java.math.BigDecimal amount;
+
     @Column(nullable = false)
     private boolean blocked;
 

@@ -1,14 +1,13 @@
 server:
-  port: 8091
+  port: 8094
 
 spring:
   application:
     name: kyc-service
-
   datasource:
-    url: jdbc:mysql://localhost:3306/upi_kyc_db?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    url: jdbc:mysql://localhost:3306/kyc_db?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:pop99558$$}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       pool-name: KycHikariPool
@@ -17,7 +16,6 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -26,11 +24,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
-
   data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/upi_kyc_docs}
-      database: upi_kyc_docs
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
@@ -41,50 +35,39 @@ spring:
           max-active: 10
           min-idle: 2
 
-  kafka:
-    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: all
-      retries: 3
-      enable-idempotence: true
-
-  servlet:
-    multipart:
-      max-file-size: 5MB
-      max-request-size: 10MB
-
-kyc:
-  mock-mode: ${KYC_MOCK_MODE:true}
-  uidai:
-    api-url: ${UIDAI_API_URL:https://api.uidai.gov.in}
-    api-key: ${UIDAI_API_KEY:}
-    otp-expiry-minutes: 10
-    max-attempts: 3
-  nsdl:
-    api-url: ${NSDL_API_URL:https://api.nsdl.co.in}
-    api-key: ${NSDL_API_KEY:}
-  face-match:
-    api-url: ${FACE_MATCH_API_URL:https://api.hyperverge.co}
-    api-key: ${FACE_MATCH_API_KEY:appId:appKey}
-    threshold: ${FACE_MATCH_THRESHOLD:80.0}
-    provider: ${FACE_MATCH_PROVIDER:MOCK}
-  storage:
-    provider: ${STORAGE_PROVIDER:LOCAL}
-    s3-bucket: ${S3_BUCKET:upi-kyc-docs}
-    s3-region: ${S3_REGION:ap-south-1}
-  expiry-years: 10
-
 eureka:
   client:
     service-url:
-      defaultZone: http://admin:admin123@localhost:8761/eureka/
+      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}
+
+kyc:
+  mock-mode: ${KYC_MOCK_MODE:true}
+  uidai:
+    api-url: ${UIDAI_API_URL:https://api.uidai.gov.in}
+    api-key: ${UIDAI_API_KEY:mock-uidai-key}
+    otp-expiry-seconds: 300
+    max-attempts: 3
+  nsdl:
+    api-url: ${NSDL_API_URL:https://api.nsdl.co.in}
+    api-key: ${NSDL_API_KEY:mock-nsdl-key}
+  face-match:
+    api-url: ${FACE_MATCH_API_URL:https://api.hyperverge.co}
+    api-key: ${FACE_MATCH_API_KEY:mock-face-key}
+    threshold: ${FACE_MATCH_THRESHOLD:80.0}
+    provider: ${FACE_MATCH_PROVIDER:MOCK}
+  limits:
+    level-0: 10000.00
+    level-1: 100000.00
+    level-2: 999999999.00
+  internal-key: ${INTERNAL_SERVICE_KEY:internal-secret-change-in-prod}
+  encryption:
+    # 32 characters key for AES-256
+    key: ${KYC_ENCRYPTION_KEY:MySuperSecretKeyForKycEncryption!!}
 
 resilience4j:
   circuitbreaker:
@@ -117,15 +100,7 @@ management:
     health:
       show-details: always
 
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    operationsSorter: method
-
 logging:
   level:
-    com.upi.kycservice: DEBUG
+    com.upimesh.kyc: DEBUG
     org.springframework.security: INFO
-    org.apache.kafka: WARN

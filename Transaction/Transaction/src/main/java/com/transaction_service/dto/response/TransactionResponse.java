@@ -14,6 +14,7 @@ public class TransactionResponse {
     private Long id;
     private String paymentId;
     private Long userId;
+    private Long merchantId;
     private Long counterPartyId;
     private String counterPartyUpiId;
     private BigDecimal amount;
@@ -29,6 +30,7 @@ public class TransactionResponse {
                 .id(t.getId())
                 .paymentId(t.getPaymentId())
                 .userId(t.getUserId())
+                .merchantId(t.getMerchantId())
                 .counterPartyId(t.getCounterPartyId())
                 .counterPartyUpiId(t.getCounterPartyUpiId())
                 .amount(t.getAmount())

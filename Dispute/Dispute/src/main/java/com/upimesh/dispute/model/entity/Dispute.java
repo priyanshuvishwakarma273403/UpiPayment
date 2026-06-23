@@ -20,6 +20,7 @@ import java.util.List;
 @Table(name = "disputes", indexes = {
         @Index(name = "idx_dispute_id", columnList = "disputeId", unique = true),
         @Index(name = "idx_dispute_txn_id", columnList = "transactionId"),
+        @Index(name = "idx_dispute_user_id", columnList = "userId"),
         @Index(name = "idx_dispute_user_upi", columnList = "userUpiId"),
         @Index(name = "idx_dispute_merchant_upi", columnList = "merchantUpiId"),
         @Index(name = "idx_dispute_status", columnList = "status")
@@ -36,6 +37,9 @@ public class Dispute {
 
     @Column(nullable = false, unique = true, length = 40)
     private String disputeId;
+
+    @Column(nullable = false, length = 100)
+    private String userId;
 
     @Column(nullable = false, length = 60)
     private String transactionId;

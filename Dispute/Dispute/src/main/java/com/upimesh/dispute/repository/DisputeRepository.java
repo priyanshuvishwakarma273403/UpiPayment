@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface DisputeRepository extends JpaRepository<Dispute, Long> {
     Optional<Dispute> findByDisputeId(String disputeId);
     Optional<Dispute> findByTransactionId(String transactionId);
+    List<Dispute> findByUserId(String userId);
     List<Dispute> findByUserUpiId(String userUpiId);
     List<Dispute> findByMerchantUpiId(String merchantUpiId);
     List<Dispute> findByStatusAndMerchantResponseDeadlineLessThanEqual(DisputeStatus status, LocalDateTime deadline);

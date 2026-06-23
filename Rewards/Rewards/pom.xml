@@ -13,10 +13,10 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.rewards_service</groupId>
-    <artifactId>Rewards</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>Rewards</name>
+    <groupId>com.upimesh</groupId>
+    <artifactId>rewards-service</artifactId>
+    <version>1.0.0</version>
+    <name>rewards-service</name>
     <description>Rewards Service</description>
 
     <properties>

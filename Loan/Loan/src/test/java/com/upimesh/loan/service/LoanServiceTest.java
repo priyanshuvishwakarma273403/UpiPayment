@@ -61,6 +61,7 @@ public class LoanServiceTest {
     public void setUp() {
         userId = "user123";
         userUpiId = "user123@upimesh";
+        org.springframework.test.util.ReflectionTestUtils.setField(loanService, "internalKey", "test-secret-key");
     }
 
     // ─── 1. CREDIT SCORING DECISION ENGINE TESTS ─────────────────────────────

@@ -39,6 +39,7 @@ graph TD
     Gateway --> |Route /reconciliation/**| RecService[📊 Reconciliation - Port 8093]
     Gateway --> |Route /kyc/**| KycService[🆔 KYC Service - Port 8094]
     Gateway --> |Route /aml/**| AmlService[🕵️ AML Service - Port 8095]
+    Gateway --> |Route /risk/**| RiskService[📊 Risk Service - Port 8096]
     
     AuthService <--> Redis1[(🔴 Redis - OTP & Attempt Cache)]
     AuthService <--> DB_Auth[(🐬 MySQL - Auth DB)]
@@ -47,8 +48,11 @@ graph TD
     TxnService <--> DB_Txn[(🐬 MySQL - Txn DB)]
     KycService <--> Redis2[(🔴 Redis - OTP Cache)]
     AmlService <--> Redis3[(🔴 Redis - Velocity Checks)]
+    RiskService <--> Redis4[(🔴 Redis - Scoring Cache)]
+    RiskService <--> DB_Risk[(🐬 MySQL - Risk DB)]
     
     NotificationService[✉️ Notification Service] <-- Async Alerts --> Gateway
+
 ```
 
 ---
@@ -77,9 +81,15 @@ graph TD
 * **Structuring Detection**: Scans the last 24h transactions to detect splitting behaviors (e.g. sending multiple ₹9,999 transactions to avoid the ₹10,000 alert threshold).
 * **Fuzzy Watchlist Screening**: Performs Levenshtein name matching ($\ge$ 80% similarity) against OFAC, UN, and Politically Exposed Persons (PEPs) watchlists.
 
-### 💰 5. End-of-Day Settlement & Reconciliation Reports
+### 📊 5. ML-Based Real-Time Risk Scoring
+* **Multiple Threat Signals**: Evaluates device fingerprint (SHA-256), location anomalies (city checking), timing patterns, and transaction amounts (3x user average) in real-time.
+* **Composite Score Calculation**: Calculates a dynamic composite risk score (0.0 to 1.0) and blocks transactions exceeding 0.7 risk threshold.
+* **Async User Profiling**: Updates user risk history and profiles asynchronously (rolling averages, evicting old devices) to maintain sub-second transaction response times.
+
+### 💰 6. End-of-Day Settlement & Reconciliation Reports
 * **Automatic Settlements**: Executes daily batch processes using **Quartz Schedulers** to group successful merchant transactions and initiate mock NEFT/RTGS/IMPS transfers.
 * **RBI Audits & Recon Engine**: Compares internal transaction logs against bank statements to generate reconciliation reports and flag discrepancies (amount mismatches, duplicate debits, missing entries) exported to Excel formats.
+
 
 ---
 
@@ -103,7 +113,9 @@ graph TD
 | **Reconciliation**| `8093` | Spring Boot, Apache POI, Quartz | EOD audit checks matching system ledger values with bank statements. |
 | **KycService** | `8094` | Spring Boot, WebFlux, Redis, AES-GCM | UIDAI/NSDL identity validations and limit updates. |
 | **AmlService** | `8095` | Spring Boot, Redis, MySQL, Levenshtein | Money laundering checks: velocity limits, structuring, PEP watchlists. |
+| **RiskScoring**| `8096` | Spring Boot, Redis, MySQL, Async | Real-time ML-like risk evaluation: device fingerprinting, location, amount, time patterns. |
 | **Frontend** | `5173` | Vite, React 18, Tailwind, Zustand, Axios | Mobile-first premium user dashboard. |
+
 
 ---
 

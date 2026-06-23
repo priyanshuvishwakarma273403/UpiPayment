@@ -43,6 +43,9 @@ public class RiskScoringResult {
     @Column(nullable = false, length = 100)
     private String userUpiId;
 
+    @Column(nullable = false, length = 100)
+    private String receiverUpiId;
+
     @Column(nullable = false)
     private double finalScore;
 

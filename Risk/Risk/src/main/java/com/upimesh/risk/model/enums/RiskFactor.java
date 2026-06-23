@@ -1,0 +1,16 @@
+package com.upimesh.risk.model.enums;
+
+public enum RiskFactor {
+    NEW_DEVICE,
+    LOCATION_ANOMALY,
+    VELOCITY_HIGH,
+    UNUSUAL_HOUR,
+    LARGE_AMOUNT,
+    NEW_RECEIVER,
+    DEVICE_MISMATCH,
+    MULTIPLE_FAILED_ATTEMPTS,
+    ACCOUNT_NEW,
+    RECEIVER_HIGH_RISK,
+    IP_PROXY,
+    IP_BLACKLISTED
+}

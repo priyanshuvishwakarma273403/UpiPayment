@@ -91,6 +91,18 @@ spring:
                 redis-rate-limiter.replenishRate: 50
                 redis-rate-limiter.burstCapacity: 100
 
+        # ---- PAYROLL SERVICE ----
+        - id: payroll-service
+          uri: lb://payroll-service
+          predicates:
+            - Path=/payroll/**
+
+        # ---- ANALYTICS SERVICE ----
+        - id: analytics-service
+          uri: lb://analytics-service
+          predicates:
+            - Path=/analytics/**
+
         # ---- MERCHANT SERVICE ----
         - id: merchant-service
           uri: lb://merchant-service

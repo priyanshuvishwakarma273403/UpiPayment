@@ -63,4 +63,16 @@ public class TransactionController {
                 "currency", "INR"
         ));
     }
+
+    /**
+     * GET /transactions/debit-between
+     * Query debit transactions between date range for analytics aggregation
+     */
+    @GetMapping("/debit-between")
+    @Operation(summary = "Get all debit transactions between two timestamps")
+    public ResponseEntity<java.util.List<TransactionResponse>> getDebitTransactionsBetween(
+            @RequestParam("from") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
+            @RequestParam("to") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to) {
+        return ResponseEntity.ok(transactionService.getDebitTransactionsBetween(from, to));
+    }
 }

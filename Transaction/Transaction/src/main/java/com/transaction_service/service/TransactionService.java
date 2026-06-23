@@ -154,6 +154,13 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
+    public List<TransactionResponse> getDebitTransactionsBetween(LocalDateTime from, LocalDateTime to) {
+        return transactionRepository.findDebitTransactionsBetween(from, to).stream()
+                .map(TransactionResponse::fromEntity)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Page<TransactionResponse> getUserTransactions(
             Long userId,
             Pageable pageable

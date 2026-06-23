@@ -44,4 +44,8 @@ public interface TransactionRepository extends JpaRepository<Transaction,Long> {
     @Query("SELECT DISTINCT t.paymentId FROM Transaction t WHERE t.paymentId IN :paymentIds")
     List<String> findExistingPaymentIds(List<String> paymentIds);
 
+    // Fetch only DEBIT transactions within a specific timestamp range
+    @Query("SELECT t FROM Transaction t WHERE t.transactionType = 'DEBIT' AND t.createdAt BETWEEN :from AND :to")
+    List<Transaction> findDebitTransactionsBetween(org.springframework.data.repository.query.Param("from") LocalDateTime from, org.springframework.data.repository.query.Param("to") LocalDateTime to);
+
 }

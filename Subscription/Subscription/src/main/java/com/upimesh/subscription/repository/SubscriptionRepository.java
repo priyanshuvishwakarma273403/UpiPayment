@@ -1,0 +1,17 @@
+package com.upimesh.subscription.repository;
+
+import com.upimesh.subscription.model.entity.Subscription;
+import com.upimesh.subscription.model.enums.SubscriptionStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
+    Optional<Subscription> findBySubscriptionId(String subscriptionId);
+    List<Subscription> findByUserId(String userId);
+    List<Subscription> findByStatusAndNextBillingDateLessThanEqual(SubscriptionStatus status, LocalDate date);
+}

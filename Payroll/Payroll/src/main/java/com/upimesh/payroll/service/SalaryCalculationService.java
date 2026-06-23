@@ -19,7 +19,8 @@ public class SalaryCalculationService {
      */
     public DeductionResult calculateDeductions(BigDecimal grossSalary) {
         if (grossSalary == null || grossSalary.compareTo(BigDecimal.ZERO) <= 0) {
-            return new DeductionResult(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+            BigDecimal zero = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            return new DeductionResult(zero, zero, zero, zero, zero);
         }
 
         // 1. PF: 12% of basic (basic = 50% of gross, basic capped at 15000)
@@ -28,7 +29,7 @@ public class SalaryCalculationService {
         BigDecimal pf = pfBasis.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_UP);
 
         // 2. ESI: 0.75% of gross if monthly gross <= 21000
-        BigDecimal esi = BigDecimal.ZERO;
+        BigDecimal esi = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         if (grossSalary.compareTo(BigDecimal.valueOf(21000.00)) <= 0) {
             esi = grossSalary.multiply(BigDecimal.valueOf(0.0075)).setScale(2, RoundingMode.HALF_UP);
         }

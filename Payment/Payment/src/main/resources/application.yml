@@ -10,7 +10,7 @@ spring:
       enabled: false
 
   datasource:
-    url: jdbc:mysql://localhost:3306/upi_payment_db?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/upi_payment_db?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:pop99558$$}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -29,7 +29,7 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
 
   kafka:
-    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:${KAFKA_SERVERS:localhost:9092}}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -51,7 +51,7 @@ payment:
 eureka:
   client:
     service-url:
-      defaultZone: http://admin:admin123@localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:${EUREKA_SERVER:http://admin:admin123@localhost:8761/eureka/}}
     fetch-registry: true
     register-with-eureka: true
   instance:

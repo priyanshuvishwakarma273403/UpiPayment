@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@FeignClient(name = "transaction-service", url = "${transaction-service.url:http://localhost:8083}")
+@FeignClient(name = "transaction-service")
 public interface TransactionServiceClient {
 
     @GetMapping("/transaction/internal/by-date")

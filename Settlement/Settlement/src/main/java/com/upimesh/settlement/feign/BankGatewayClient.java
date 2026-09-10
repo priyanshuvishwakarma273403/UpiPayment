@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "bank-gateway-service", url = "${bank-gateway-service.url:http://localhost:8091}")
+@FeignClient(name = "bank-gateway-service")
 public interface BankGatewayClient {
 
     @GetMapping("/bank/accounts/primary/{merchantUpiId}")

@@ -63,8 +63,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getPath().value();
 
-        // Public endpoint hai? Filter skip karo
-        if(isPublicEndpoint(path)) {
+        // Public endpoint ya internal service request hai? Filter skip karo
+        if (isPublicEndpoint(path) || isInternalRequest(request, path)) {
             return chain.filter(exchange);
         }
 
@@ -136,6 +136,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
      */
     private boolean isPublicEndpoint(String path) {
         return PUBLIC_ENDPOINTS.stream().anyMatch(path::startsWith);
+    }
+
+    private boolean isInternalRequest(ServerHttpRequest request, String path) {
+        if (path.contains("/internal/")) {
+            return true;
+        }
+        String serviceKey = request.getHeaders().getFirst("X-Internal-Service-Key");
+        return serviceKey != null && !serviceKey.isBlank();
     }
 
     @Override

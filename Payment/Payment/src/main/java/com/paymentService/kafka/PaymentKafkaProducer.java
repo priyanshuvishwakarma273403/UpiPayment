@@ -43,8 +43,9 @@ public class PaymentKafkaProducer {
     // Topic names - constants
     public static final String TOPIC_PAYMENT_INITIATED = "payment_initiated";
     public static final String TOPIC_PAYMENT_COMPLETED = "payment_completed";
-    public static final String TOPIC_PAYMENT_FAILED = "payment_failed";
-    public static final String TOPIC_FRAUD_DETECTED = "fraud_detected";
+    public static final String TOPIC_PAYMENT_FAILED    = "payment_failed";
+    public static final String TOPIC_PAYMENT_REVERSED  = "payment_reversed";
+    public static final String TOPIC_FRAUD_DETECTED    = "fraud_detected";
 
     /**
      * Payment initiate hone par event publish karo
@@ -69,12 +70,25 @@ public class PaymentKafkaProducer {
     }
 
     /**
+     * Payment reverse hone par event publish karo
+     */
+    public void publishPaymentReversed(PaymentEvent event) {
+        publishEvent(TOPIC_PAYMENT_REVERSED, event.getPaymentId(), event);
+    }
+
+    /**
      * Generic event publish method
      * CompletableFuture ke through async send karta hai
      */
     private void publishEvent(String topic, String key, Object event){
         try{
             String eventJson = objectMapper.writeValueAsString(event);
+            String correlationId = (event instanceof PaymentEvent pe && pe.getCorrelationId() != null) 
+                    ? pe.getCorrelationId() : key;
+            String eventId = (event instanceof PaymentEvent pe && pe.getEventId() != null) 
+                    ? pe.getEventId() : "EVT-" + key;
+
+            log.info("[{}] Publishing eventId={} to topic '{}' for key '{}'", correlationId, eventId, topic, key);
 
             // Async send - callback se success/failure pata chalega
             CompletableFuture<SendResult<String, String>> future =
@@ -82,13 +96,13 @@ public class PaymentKafkaProducer {
 
             future.whenComplete((result, ex) -> {
                 if(ex == null){
-                    log.info("Event published to topic '{}', partition: {}, offset: {}",
+                    log.info("[{}] Event published to topic '{}', partition: {}, offset: {}",
+                            correlationId,
                             topic,
                             result.getRecordMetadata().partition(),
                             result.getRecordMetadata().offset());
                 }else{
-                    log.error("Failed to publish event to topic '{}': {}", topic, ex.getMessage());
-                    // Production mein: retry mechanism ya dead-letter queue
+                    log.error("[{}] Failed to publish event to topic '{}': {}", correlationId, topic, ex.getMessage());
                 }
             });
         }catch(Exception e){

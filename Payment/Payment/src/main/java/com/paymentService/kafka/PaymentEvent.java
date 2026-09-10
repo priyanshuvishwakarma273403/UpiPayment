@@ -18,6 +18,13 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PaymentEvent {
+    private String eventId;
+    private String eventType;
+    private String eventVersion;
+    private LocalDateTime occurredAt;
+    private String correlationId;
+    private String currency;
+
     private String paymentId;
     private Long senderId;
     private Long receiverId;
@@ -33,20 +40,31 @@ public class PaymentEvent {
 
     // Factory method from Payment entity
     public static PaymentEvent fromPayment(Payment payment) {
+        return fromPayment(payment, null, payment.getPaymentStatus() != null ? payment.getPaymentStatus().name() : "TRANSACTION_EVENT");
+    }
+
+    public static PaymentEvent fromPayment(Payment payment, String correlationId, String eventType) {
+        String evtId = "EVT-" + java.util.UUID.randomUUID().toString();
+        LocalDateTime now = LocalDateTime.now();
         return PaymentEvent.builder()
+                .eventId(evtId)
+                .eventType(eventType != null ? eventType : (payment.getPaymentStatus() != null ? payment.getPaymentStatus().name() : "TRANSACTION_EVENT"))
+                .eventVersion("v1")
+                .occurredAt(now)
+                .correlationId(correlationId != null ? correlationId : evtId)
+                .currency("INR")
                 .paymentId(payment.getPaymentId())
                 .senderId(payment.getSenderId())
                 .receiverId(payment.getReceiverId())
                 .senderUpiId(payment.getSenderUpiId())
                 .receiverUpiId(payment.getReceiverUpiId())
                 .amount(payment.getAmount())
-                .paymentStatus(payment.getPaymentStatus().name())
-                .paymentMode(payment.getPaymentMode().name())
+                .paymentStatus(payment.getPaymentStatus() != null ? payment.getPaymentStatus().name() : "INITIATED")
+                .paymentMode(payment.getPaymentMode() != null ? payment.getPaymentMode().name() : "UPI")
                 .description(payment.getDescription())
                 .fraudScore(payment.getFraudScore())
-                .fraudStatus(payment.getFraudStatus().name())
-                .timestamp(LocalDateTime.now())
+                .fraudStatus(payment.getFraudStatus() != null ? payment.getFraudStatus().name() : "SAFE")
+                .timestamp(now)
                 .build();
     }
-
 }

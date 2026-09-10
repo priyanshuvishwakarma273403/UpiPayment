@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.Map;
 
-@FeignClient(name = "npci-integration-service", url = "${npci-integration-service.url:http://localhost:8086}")
+@FeignClient(name = "npci-integration-service")
 public interface NpciServiceClient {
 
     @GetMapping("/npci/internal/status/{transactionId}")

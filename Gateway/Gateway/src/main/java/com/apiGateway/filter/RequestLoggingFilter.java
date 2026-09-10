@@ -23,26 +23,35 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         Instant start = Instant.now();
 
-        String requestId = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String correlationId = request.getHeaders().getFirst("X-Correlation-ID");
+        if (correlationId == null || correlationId.isBlank()) {
+            correlationId = request.getHeaders().getFirst("X-Request-Id");
+        }
+        if (correlationId == null || correlationId.isBlank()) {
+            correlationId = "CORR-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        }
+
         log.info("[{}] --> {} {} | IP: {} | User-Agent: {}",
-                requestId,
+                correlationId,
                 request.getMethod(),
                 request.getPath().value(),
                 getClientIp(request),
                 request.getHeaders().getFirst("User-Agent"));
 
-        // X-Request-Id header add karo (tracing ke liye)
+        // X-Correlation-ID aur X-Request-Id header add/propagate karo
         ServerHttpRequest mutatedRequest = request.mutate()
-                .header("X-Request-Id", requestId)
+                .header("X-Correlation-ID", correlationId)
+                .header("X-Request-Id", correlationId)
                 .build();
 
+        final String finalCorrelationId = correlationId;
         return chain.filter(exchange.mutate().request(mutatedRequest).build())
                 .then(Mono.fromRunnable(() -> {
                     ServerHttpResponse response = exchange.getResponse();
                     long duration = Duration.between(start, Instant.now()).toMillis();
 
                     log.info("[{}] <-- {} {} | Status: {} | Time: {}ms",
-                            requestId,
+                            finalCorrelationId,
                             request.getMethod(),
                             request.getPath().value(),
                             response.getStatusCode(),

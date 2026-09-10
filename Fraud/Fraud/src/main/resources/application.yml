@@ -14,17 +14,17 @@ spring:
       uri: ${MONGODB_URI:mongodb://localhost:27017/upi_fraud_db}
       database: upi_fraud_db
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${SPRING_REDIS_HOST:${REDIS_HOST:localhost}}
       port: ${REDIS_PORT:6379}
       timeout: 2000ms
 
   kafka:
-    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:${KAFKA_SERVERS:localhost:9092}}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://admin:admin123@localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:${EUREKA_SERVER:http://admin:admin123@localhost:8761/eureka/}}
     fetch-registry: true
     register-with-eureka: true
   instance:

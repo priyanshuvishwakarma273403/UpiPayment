@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.upimesh.referral.service.ReferralServiceTest
 -------------------------------------------------------------------------------
-Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.022 s -- in com.upimesh.referral.service.ReferralServiceTest
+Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.213 s -- in com.upimesh.referral.service.ReferralServiceTest

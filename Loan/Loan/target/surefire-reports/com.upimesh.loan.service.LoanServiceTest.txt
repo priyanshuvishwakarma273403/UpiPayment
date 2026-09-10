@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.upimesh.loan.service.LoanServiceTest
 -------------------------------------------------------------------------------
-Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.488 s -- in com.upimesh.loan.service.LoanServiceTest
+Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.684 s -- in com.upimesh.loan.service.LoanServiceTest

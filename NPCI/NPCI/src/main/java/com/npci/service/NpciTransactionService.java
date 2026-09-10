@@ -110,8 +110,8 @@ public class NpciTransactionService {
                     new FraudServiceClient.FraudCheckRequest(txnId, request.getSenderUpiId(),
                             request.getReceiverUpiId(), request.getAmount(),
                             request.getDeviceId(), request.getIpAddress(), request.getType().name()));
-            if (!fraud.allowed()) {
-                throw new TransactionBlockedException("Transaction blocked: " + fraud.blockReason());
+            if (!fraud.isAllowed()) {
+                throw new TransactionBlockedException("Transaction blocked: " + fraud.getBlockReason());
             }
         } catch (TransactionBlockedException e) {
             throw e;

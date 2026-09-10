@@ -1,0 +1,662 @@
+version: '3.8'
+
+networks:
+  upimesh-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  mongo_data:
+
+services:
+  # ==========================================
+  # Infrastructure Services
+  # ==========================================
+  mysql:
+    image: mysql:8.0
+    container_name: upimesh-mysql
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_USER: ${MYSQL_USER:-upimesh}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-upimesh}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - upimesh-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: upimesh-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - upimesh-network
+
+  mongodb:
+    image: mongo:6.0
+    container_name: upimesh-mongo
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - upimesh-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: upimesh-zookeeper
+    ports:
+      - "${ZOOKEEPER_PORT:-2181}:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - upimesh-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: upimesh-kafka
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - upimesh-network
+
+  # ==========================================
+  # Service Discovery & Gateway
+  # ==========================================
+  eureka-server:
+    build:
+      context: ./Eureka/Eureka
+    container_name: upimesh-eureka
+    ports:
+      - "${EUREKA_SERVER_PORT:-8761}:8761"
+    environment:
+      EUREKA_SERVER_USER: ${EUREKA_SERVER_USER:-admin}
+      EUREKA_SERVER_PASSWORD: ${EUREKA_SERVER_PASSWORD:-admin123}
+    networks:
+      - upimesh-network
+
+  api-gateway:
+    build:
+      context: ./Gateway/Gateway
+    container_name: upimesh-gateway
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      eureka-server:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-c2VudGluZWx4X3VwaV9tZXNoX3NlY3VyZV9qd3Rfc2VjcmV0X2tleV8yMDI2}
+    networks:
+      - upimesh-network
+
+  # ==========================================
+  # Domain Microservices (24 Services)
+  # ==========================================
+  auth:
+    build:
+      context: ./Auth/Auth
+    container_name: upimesh-auth
+    ports:
+      - "${AUTH_PORT:-8081}:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/upi_auth_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-c2VudGluZWx4X3VwaV9tZXNoX3NlY3VyZV9qd3Rfc2VjcmV0X2tleV8yMDI2}
+    networks:
+      - upimesh-network
+
+  wallet:
+    build:
+      context: ./Wallet/Wallet
+    container_name: upimesh-wallet
+    ports:
+      - "${WALLET_PORT:-8082}:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/upi_wallet_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - upimesh-network
+
+  payment:
+    build:
+      context: ./Payment/Payment
+    container_name: upimesh-payment
+    ports:
+      - "${PAYMENT_PORT:-8083}:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/upi_payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - upimesh-network
+
+  transaction:
+    build:
+      context: ./Transaction/Transaction
+    container_name: upimesh-transaction
+    ports:
+      - "${TRANSACTION_PORT:-8084}:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/upi_transaction_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/upi_transaction_logs
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - upimesh-network
+
+  merchant:
+    build:
+      context: ./Merchant/Merchant
+    container_name: upimesh-merchant
+    ports:
+      - "${MERCHANT_PORT:-8085}:8085"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/upi_merchant_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+    networks:
+      - upimesh-network
+
+  fraud:
+    build:
+      context: ./Fraud/Fraud
+    container_name: upimesh-fraud
+    ports:
+      - "${FRAUD_PORT:-8086}:8086"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/upi_fraud_db
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - upimesh-network
+
+  aiservice:
+    build:
+      context: ./AiService/AiService
+    container_name: upimesh-aiservice
+    ports:
+      - "${AI_SERVICE_PORT:-8087}:8087"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/upi_ai_db
+    networks:
+      - upimesh-network
+
+  notification:
+    build:
+      context: ./Notification/Notification
+    container_name: upimesh-notification
+    ports:
+      - "${NOTIFICATION_PORT:-8088}:8088"
+    depends_on:
+      kafka:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - upimesh-network
+
+  sync:
+    build:
+      context: ./Sync/Sync
+    container_name: upimesh-sync
+    ports:
+      - "${SYNC_PORT:-8089}:8089"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/upi_sync_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - upimesh-network
+
+  npci:
+    build:
+      context: ./NPCI/NPCI
+    container_name: upimesh-npci
+    ports:
+      - "${NPCI_PORT:-8090}:8090"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/npci_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  bankgateway:
+    build:
+      context: ./BankGateway/BankGateway
+    container_name: upimesh-bankgateway
+    ports:
+      - "${BANK_GATEWAY_PORT:-8091}:8091"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bank_gateway_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  settlement:
+    build:
+      context: ./Settlement/Settlement
+    container_name: upimesh-settlement
+    ports:
+      - "${SETTLEMENT_PORT:-8092}:8092"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/settlement_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  reconciliation:
+    build:
+      context: ./Reconciliation/Reconciliation
+    container_name: upimesh-reconciliation
+    ports:
+      - "${RECONCILIATION_PORT:-8093}:8093"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/reconciliation_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  kyc:
+    build:
+      context: ./Kyc/Kyc
+    container_name: upimesh-kyc
+    ports:
+      - "${KYC_PORT:-8094}:8094"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/kyc_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  aml:
+    build:
+      context: ./Aml/Aml
+    container_name: upimesh-aml
+    ports:
+      - "${AML_PORT:-8095}:8095"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/aml_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  risk:
+    build:
+      context: ./Risk/Risk
+    container_name: upimesh-risk
+    ports:
+      - "${RISK_PORT:-8096}:8096"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/risk_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  subscription:
+    build:
+      context: ./Subscription/Subscription
+    container_name: upimesh-subscription
+    ports:
+      - "${SUBSCRIPTION_PORT:-8098}:8098"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/subscription_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  invoice:
+    build:
+      context: ./Invoice/Invoice
+    container_name: upimesh-invoice
+    ports:
+      - "${INVOICE_PORT:-8099}:8099"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/invoice_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  dispute:
+    build:
+      context: ./Dispute/Dispute
+    container_name: upimesh-dispute
+    ports:
+      - "${DISPUTE_PORT:-8100}:8100"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/dispute_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  rewards:
+    build:
+      context: ./Rewards/Rewards
+    container_name: upimesh-rewards
+    ports:
+      - "${REWARDS_PORT:-8101}:8101"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/rewards_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  loan:
+    build:
+      context: ./Loan/Loan
+    container_name: upimesh-loan
+    ports:
+      - "${LOAN_PORT:-8102}:8102"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/loan_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+    networks:
+      - upimesh-network
+
+  referral:
+    build:
+      context: ./Referral/Referral
+    container_name: upimesh-referral
+    ports:
+      - "${REFERRAL_PORT:-8103}:8103"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/referral_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network
+
+  payroll:
+    build:
+      context: ./Payroll/Payroll
+    container_name: upimesh-payroll
+    ports:
+      - "${PAYROLL_PORT:-8104}:8104"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/payroll_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+    networks:
+      - upimesh-network
+
+  analytics:
+    build:
+      context: ./Analytics/Analytics
+    container_name: upimesh-analytics
+    ports:
+      - "${ANALYTICS_PORT:-8105}:8105"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://admin:admin123@eureka-server:8761/eureka/}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/analytics_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-upimesh}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-upimesh_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    networks:
+      - upimesh-network

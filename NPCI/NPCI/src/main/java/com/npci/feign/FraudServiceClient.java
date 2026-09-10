@@ -48,13 +48,17 @@ public interface FraudServiceClient {
             String decision,
             String reasons
     ) {
-        public boolean allowed() {
+        public Boolean allowed() {
+            return allowed;
+        }
+
+        public boolean isAllowed() {
             if (allowed != null) return allowed;
             if (decision != null) return !"BLOCKED".equalsIgnoreCase(decision);
             return true;
         }
 
-        public String blockReason() {
+        public String getBlockReason() {
             if (blockReason != null) return blockReason;
             if (reasons != null) return reasons;
             return "Transaction blocked by fraud rules";
@@ -73,7 +77,7 @@ public interface FraudServiceClient {
         public FraudCheckResponse checkTransaction(String serviceKey, FraudCheckRequest request) {
             System.err.println(" Fraud service unavailable — allowing transaction: "
                     + request.transactionId());
-            return new FraudCheckResponse(true, "UNKNOWN", 0.0, null);
+            return new FraudCheckResponse(true, "UNKNOWN", 0.0, null, "SAFE", null);
         }
     }
 }

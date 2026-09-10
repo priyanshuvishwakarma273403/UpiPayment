@@ -21,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping({"/transactions", "/transaction"})
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 @Tag(name = "Transactions", description = "Transaction history and ledger APIs")
 public class TransactionController {
 

@@ -121,30 +121,46 @@ graph TD
 
 ## 🛠️ Installation & Getting Started
 
-### 📋 Prerequisites
-Ensure you have the following installed on your machine:
-* **Java Development Kit (JDK) 17** or higher
-* **Node.js** (v18+) & **npm**
-* **MySQL Database Server**
-* **Redis Server** (running locally on port `6379`)
+### 🐳 Quick Start with Docker Compose (Recommended)
 
-### 🏁 Step 1: Run the Backend Microservices
-Run the core services in the following recommended order (ensure Eureka and Gateway are running first):
+Run the entire platform (Infrastructure + Service Discovery + API Gateway + 24 Domain Microservices) with a single command:
+
+1. **Setup Environment Variables**:
+   ```bash
+   cp .env.example .env
+   ```
+2. **Start Complete Platform**:
+   ```bash
+   docker compose up -d
+   ```
+3. **Verify Service Health**:
+   ```bash
+   docker compose ps
+   ```
+4. **Access Eureka Dashboard**: Open `http://localhost:8761` (Login: `admin` / `admin123`)
+
+For full runbook, container logs, rebuilding single services, and troubleshooting, see [docs/runbooks/local-development.md](docs/runbooks/local-development.md).
+
+---
+
+### 💻 Manual Development Setup (Maven)
+
+Ensure you have **JDK 17**, **Node.js 18+**, **MySQL**, and **Redis** running locally.
 
 1. **Start Discovery Registry (Eureka)**:
    ```bash
    cd Eureka/Eureka
-   ./mvnw spring-boot:run
+   mvn spring-boot:run
    ```
 2. **Start API Gateway**:
    ```bash
    cd Gateway/Gateway
-   ./mvnw spring-boot:run
+   mvn spring-boot:run
    ```
 3. **Start Authentication Service (Auth)**:
    ```bash
    cd Auth/Auth
-   ./mvnw spring-boot:run
+   mvn spring-boot:run
    ```
 4. **Start the remaining business services** (Wallet, Payment, KycService, AmlService, etc.) in their respective directories using:
    ```bash

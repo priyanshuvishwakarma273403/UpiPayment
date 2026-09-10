@@ -366,8 +366,15 @@ public class SettlementService {
     private void linkTransactions(String settlementId, List<UnsettledTransactionDto> txns) {
         for (UnsettledTransactionDto txn : txns) {
             BigDecimal rawFee = calculationService.calculatePlatformFee(txn.amount());
+            if (rawFee == null) {
+                rawFee = BigDecimal.ZERO;
+            }
             BigDecimal gst = calculationService.calculateGst(rawFee);
-            BigDecimal net = txn.amount().subtract(rawFee).subtract(gst);
+            if (gst == null) {
+                gst = BigDecimal.ZERO;
+            }
+            BigDecimal txnAmount = txn.amount() != null ? txn.amount() : BigDecimal.ZERO;
+            BigDecimal net = txnAmount.subtract(rawFee).subtract(gst);
 
             SettlementTransaction st = SettlementTransaction.builder()
                     .settlementId(settlementId)
@@ -376,7 +383,7 @@ public class SettlementService {
                     .amount(txn.amount())
                     .platformFee(rawFee.add(gst))
                     .netAmount(net)
-                    .transactionDate(txn.completedAt().toLocalDate())
+                    .transactionDate(txn.completedAt() != null ? txn.completedAt().toLocalDate() : LocalDate.now())
                     .build();
             settlementTxnRepo.save(st);
         }

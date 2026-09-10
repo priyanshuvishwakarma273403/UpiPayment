@@ -152,4 +152,70 @@ public class WalletController {
                 .build());
     }
 
+    /**
+     * POST /wallet/internal/debit
+     */
+    @PostMapping("/internal/debit")
+    @Operation(summary = "Internal debit endpoint")
+    public ResponseEntity<Map<String, Object>> internalDebit(
+            @RequestHeader(value = "X-Internal-Service-Key", required = false) String serviceKey,
+            @RequestBody Map<String, Object> body) {
+        String txnId = (String) body.get("transactionId");
+        String upiId = (String) body.get("upiId");
+        BigDecimal amount = body.get("amount") != null ? new BigDecimal(body.get("amount").toString()) : BigDecimal.ZERO;
+        log.info("Internal debit: txnId={}, upiId={}, amount={}", txnId, upiId, amount);
+        if (upiId != null) {
+            walletService.debitWalletByUpiId(upiId, amount, txnId);
+        }
+        return ResponseEntity.ok(Map.of("success", true, "transactionId", txnId != null ? txnId : ""));
+    }
+
+    /**
+     * POST /wallet/internal/credit
+     */
+    @PostMapping("/internal/credit")
+    @Operation(summary = "Internal credit endpoint")
+    public ResponseEntity<Map<String, Object>> internalCredit(
+            @RequestHeader(value = "X-Internal-Service-Key", required = false) String serviceKey,
+            @RequestBody Map<String, Object> body) {
+        String txnId = (String) body.get("transactionId");
+        String upiId = (String) body.get("upiId");
+        BigDecimal amount = body.get("amount") != null ? new BigDecimal(body.get("amount").toString()) : BigDecimal.ZERO;
+        log.info("Internal credit: txnId={}, upiId={}, amount={}", txnId, upiId, amount);
+        if (upiId != null) {
+            walletService.creditWalletByUpiId(upiId, amount, txnId);
+        }
+        return ResponseEntity.ok(Map.of("success", true, "transactionId", txnId != null ? txnId : ""));
+    }
+
+    /**
+     * POST /wallet/freeze
+     */
+    @PostMapping("/freeze")
+    @Operation(summary = "Freeze wallet amount")
+    public ResponseEntity<Map<String, Object>> freezeWallet(
+            @RequestBody Map<String, Object> body) {
+        Long userId = body.get("userId") != null ? Long.valueOf(body.get("userId").toString()) : null;
+        BigDecimal amount = body.get("amount") != null ? new BigDecimal(body.get("amount").toString()) : BigDecimal.ZERO;
+        if (userId != null) {
+            walletService.freezeAmount(userId, amount);
+        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "Amount frozen"));
+    }
+
+    /**
+     * POST /wallet/release
+     */
+    @PostMapping("/release")
+    @Operation(summary = "Release frozen wallet amount")
+    public ResponseEntity<Map<String, Object>> releaseWallet(
+            @RequestBody Map<String, Object> body) {
+        Long userId = body.get("userId") != null ? Long.valueOf(body.get("userId").toString()) : null;
+        BigDecimal amount = body.get("amount") != null ? new BigDecimal(body.get("amount").toString()) : BigDecimal.ZERO;
+        if (userId != null) {
+            walletService.releaseAmount(userId, amount);
+        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "Amount released"));
+    }
+
 }

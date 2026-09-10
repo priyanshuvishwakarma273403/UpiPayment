@@ -115,7 +115,7 @@ public class RiskScoringServiceTest {
 
         assertNotNull(response);
         assertTrue(response.isAllowed()); // 0.1 + 0.2 = 0.3 (LOW since threshold is 0.3)
-        assertEquals(0.3, response.getFinalScore());
+        assertEquals(0.3, response.getFinalScore(), 1e-4);
         assertTrue(response.getFactorsTriggered().contains("NEW_DEVICE"));
     }
 
@@ -146,7 +146,7 @@ public class RiskScoringServiceTest {
         assertNotNull(response);
         assertTrue(response.isAllowed()); // 0.1 + 0.25 = 0.35 (MEDIUM)
         assertEquals(RiskLevel.MEDIUM, response.getRiskLevel());
-        assertEquals(0.35, response.getFinalScore());
+        assertEquals(0.35, response.getFinalScore(), 1e-4);
         assertTrue(response.getFactorsTriggered().contains("LOCATION_ANOMALY"));
     }
 

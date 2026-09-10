@@ -199,4 +199,18 @@ public class WalletService {
         return walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new WalletException("Wallet not found for userId: " + userId));
     }
+
+    @Transactional
+    public void debitWalletByUpiId(String upiId, BigDecimal amount, String paymentId) {
+        walletRepository.findByUpiId(upiId).ifPresent(wallet -> {
+            debitWallet(wallet.getUserId(), amount, paymentId);
+        });
+    }
+
+    @Transactional
+    public void creditWalletByUpiId(String upiId, BigDecimal amount, String paymentId) {
+        walletRepository.findByUpiId(upiId).ifPresent(wallet -> {
+            creditWallet(wallet.getUserId(), amount, paymentId);
+        });
+    }
 }

@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;
 
 @FeignClient(
@@ -13,28 +14,52 @@ import java.math.BigDecimal;
 )
 public interface FraudServiceClient {
 
-    @PostMapping("/fraud/internal/check")
+    @PostMapping("/fraud/check")
     FraudCheckResponse checkTransaction(
-            @RequestHeader("X-Internal-Service-Key") String serviceKey,
+            @RequestHeader(value = "X-Internal-Service-Key", required = false) String serviceKey,
             @RequestBody FraudCheckRequest request
     );
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     record FraudCheckRequest(
-            String transactionId,
+            String paymentId,
+            Long senderId,
+            Long receiverId,
             String senderUpiId,
             String receiverUpiId,
             BigDecimal amount,
+            String paymentMode,
             String deviceId,
-            String ipAddress,
-            String transactionType
-    ){}
+            String ipAddress
+    ){
+        public FraudCheckRequest(String transactionId, String senderUpiId, String receiverUpiId, BigDecimal amount, String deviceId, String ipAddress, String transactionType) {
+            this(transactionId, 1L, null, senderUpiId, receiverUpiId, amount, transactionType, deviceId, ipAddress);
+        }
+        public String transactionId() { return paymentId; }
+        public String transactionType() { return paymentMode; }
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     record FraudCheckResponse(
-            boolean allowed,
-            String riskLevel,       // "LOW", "MEDIUM", "HIGH"
-            double riskScore,       // 0.0 to 1.0
-            String blockReason      // Non-null if allowed=false
-    ) {}
+            Boolean allowed,
+            String riskLevel,
+            Double riskScore,
+            String blockReason,
+            String decision,
+            String reasons
+    ) {
+        public boolean allowed() {
+            if (allowed != null) return allowed;
+            if (decision != null) return !"BLOCKED".equalsIgnoreCase(decision);
+            return true;
+        }
+
+        public String blockReason() {
+            if (blockReason != null) return blockReason;
+            if (reasons != null) return reasons;
+            return "Transaction blocked by fraud rules";
+        }
+    }
 
     /**
      * Fallback: if Fraud Service is down, allow transaction to proceed.

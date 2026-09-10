@@ -1,5 +1,6 @@
 package com.npci.model.exception;
 
+import com.npci.exception.*;
 import com.npci.model.response.ApiResponse;
 import jakarta.transaction.InvalidTransactionException;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +24,8 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(TransactionalIdNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNotFound(TransactionalIdNotFoundException ex) {
+    @ExceptionHandler({TransactionalIdNotFoundException.class, TransactionNotFoundException.class})
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(Exception ex) {
         log.warn("Transaction not found: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage(), "TXN_NOT_FOUND"));

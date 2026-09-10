@@ -1,6 +1,7 @@
 package com.npci.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.npci.exception.DuplicateTransactionException;
 import com.npci.model.entity.RefundRecord;
 import com.npci.model.entity.UpiTransaction;
 import com.npci.model.enums.RefundStatus;

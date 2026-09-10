@@ -84,4 +84,24 @@ public class BankGatewayController {
         UpiResolveResponse response = upiResolveService.resolveUpiHandle(upiHandle);
         return ApiResponse.success(response, "UPI handle resolved successfully");
     }
+
+    @GetMapping("/accounts/primary/{merchantUpiId}")
+    public org.springframework.http.ResponseEntity<?> getPrimaryAccount(
+            @RequestHeader(value = "X-Internal-Service-Key", required = false) String serviceKey,
+            @PathVariable String merchantUpiId) {
+        log.info("REST request to get primary account for merchant: {}", merchantUpiId);
+        com.upimesh.bankgateway.model.entity.LinkedBankAccount account = bankAccountService.getPrimaryAccount(merchantUpiId);
+        if (account == null) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        java.util.Map<String, Object> details = java.util.Map.of(
+                "accountId", account.getAccountId(),
+                "encryptedAccountNumber", account.getEncryptedAccountNumber(),
+                "maskedAccountNumber", account.getMaskedAccountNumber(),
+                "ifscCode", account.getIfscCode(),
+                "bankName", account.getBankName(),
+                "bankReferenceToken", account.getBankReferenceToken() != null ? account.getBankReferenceToken() : "TOK_DEFAULT"
+        );
+        return org.springframework.http.ResponseEntity.ok(details);
+    }
 }

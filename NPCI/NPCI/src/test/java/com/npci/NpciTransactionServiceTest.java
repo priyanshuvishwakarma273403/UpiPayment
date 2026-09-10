@@ -2,6 +2,7 @@ package com.npci;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.npci.exception.*;
 import com.npci.model.entity.UpiTransaction;
 import com.npci.model.enums.TransactionStatus;
 import com.npci.model.enums.TransactionType;
@@ -44,7 +45,7 @@ class NpciTransactionServiceTest {
     void setup() {
         ReflectionTestUtils.setField(service, "perTransactionMax", new BigDecimal("100000"));
         ReflectionTestUtils.setField(service, "dailyMax", new BigDecimal("200000"));
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
     }
 
     private InitiateTransactionRequest validRequest() {
@@ -59,7 +60,7 @@ class NpciTransactionServiceTest {
     }
 
     @Test
-    void shouldSucceedForValidTransaction() {
+    void shouldSucceedForValidTransaction() throws Exception {
         when(redisTemplate.hasKey(anyString())).thenReturn(false);
         when(transactionRepo.getDailyTotal(any(), any())).thenReturn(BigDecimal.ZERO);
         when(transactionRepo.findRecentDuplicate(any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -103,7 +104,7 @@ class NpciTransactionServiceTest {
     }
 
     @Test
-    void shouldReturnExistingTransactionForDuplicateIdempotencyKey() {
+    void shouldReturnExistingTransactionForDuplicateIdempotencyKey() throws Exception {
         when(redisTemplate.hasKey(anyString())).thenReturn(true);
         when(valueOps.get(anyString())).thenReturn("TXN_EXISTING_001");
 
@@ -126,7 +127,7 @@ class NpciTransactionServiceTest {
     }
 
     @Test
-    void shouldHandleNpciDeclinedResponse() {
+    void shouldHandleNpciDeclinedResponse() throws Exception {
         when(redisTemplate.hasKey(anyString())).thenReturn(false);
         when(transactionRepo.getDailyTotal(any(), any())).thenReturn(BigDecimal.ZERO);
         when(transactionRepo.findRecentDuplicate(any(), any(), any(), any())).thenReturn(Optional.empty());

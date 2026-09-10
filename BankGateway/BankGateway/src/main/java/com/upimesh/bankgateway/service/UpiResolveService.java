@@ -58,7 +58,7 @@ public class UpiResolveService {
         entity.setMaskedAccountNumber(response.get("maskedAccount"));
         entity.setIfscCode(response.get("ifscCode"));
         entity.setVerificationStatus(VerificationStatus.VERIFIED);
-        entity.setIsActive(true);
+        entity.setActive(true);
         entity.setLastResolvedAt(LocalDateTime.now());
 
         entity = upiHandleRepo.save(entity);
@@ -82,14 +82,14 @@ public class UpiResolveService {
 
                 if (response == null || response.containsKey("error") || !"true".equals(response.get("active"))) {
                     log.warn("Stale resolution for {} is now inactive or not found. Deactivating.", resolution.getUpiHandle());
-                    resolution.setIsActive(false);
+                    resolution.setActive(false);
                     resolution.setVerificationStatus(VerificationStatus.FAILED);
                 } else {
                     resolution.setAccountHolderName(response.get("holderName"));
                     resolution.setMaskedAccountNumber(response.get("maskedAccount"));
                     resolution.setIfscCode(response.get("ifscCode"));
                     resolution.setVerificationStatus(VerificationStatus.VERIFIED);
-                    resolution.setIsActive(true);
+                    resolution.setActive(true);
                 }
                 resolution.setLastResolvedAt(LocalDateTime.now());
                 upiHandleRepo.save(resolution);

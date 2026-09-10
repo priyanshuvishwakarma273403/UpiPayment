@@ -6,6 +6,7 @@ d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliatio
 d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliation\exception\InvalidStatementException.java
 d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliation\exception\ReconciliationAlreadyRunException.java
 d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliation\exception\ReconciliationNotFoundException.java
+d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliation\exception\SettlementProcessingException.java
 d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliation\feign\NpciServiceClient.java
 d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliation\feign\TransactionServiceClient.java
 d:\UpiMesh\Reconciliation\Reconciliation\src\main\java\com\upimesh\reconciliation\model\dto\BankStatementEntry.java

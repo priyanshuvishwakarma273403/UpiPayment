@@ -38,10 +38,10 @@ public class FraudController {
     private final FraudLogRepository fraudLogRepository;
 
     /**
-     * POST /fraud/check
+     * POST /fraud/check or /fraud/internal/check
      * Manual fraud check (Kafka ke alawa direct call ke liye)
      */
-    @PostMapping("/check")
+    @PostMapping({"/check", "/internal/check"})
     @Operation(
             summary = "Check payment for fraud",
             description = "Run fraud detection rules + AI scoring. Returns SAFE/ REVIEW / BLOCKED."

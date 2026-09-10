@@ -41,6 +41,7 @@ public class SecurityConfig {
     @Value("${internal.service-key:internal-secret-change-in-prod}")
     private String internalServiceKey;
 
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -67,7 +68,6 @@ public class SecurityConfig {
 
     // ─── Inner Filter Class ───────────────────────────────────────────────────
 
-    @Component
     @Slf4j
     public static class InternalServiceKeyFilter extends OncePerRequestFilter {
 

@@ -23,10 +23,23 @@ import java.util.Map;
  * ================================================================
  */
 @RestController
-@RequestMapping("/notifications")
+@RequestMapping({"/notifications", "/notification"})
 @Slf4j
 @Tag(name = "Notifications", description = "Notification service status and test APIs")
 public class NotificationController {
+
+    /**
+     * POST /notification/internal/payment
+     * Internal endpoint called by NPCI/Payment service
+     */
+    @org.springframework.web.bind.annotation.PostMapping({"/internal/payment", "/payment"})
+    @Operation(summary = "Send internal payment notification")
+    public ResponseEntity<Map<String, Object>> sendPaymentNotification(
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Internal-Service-Key", required = false) String serviceKey,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        log.info("Received internal payment notification: {}", request);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Notification accepted"));
+    }
 
     /**
      * GET /notifications/health

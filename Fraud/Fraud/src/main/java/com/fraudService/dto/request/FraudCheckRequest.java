@@ -23,7 +23,7 @@ public class FraudCheckRequest {
     @NotBlank(message = "payment required")
     private String paymentId;
 
-    @NotBlank(message = "senderId required")
+    @NotNull(message = "senderId required")
     private Long senderId;
 
     private Long receiverId;

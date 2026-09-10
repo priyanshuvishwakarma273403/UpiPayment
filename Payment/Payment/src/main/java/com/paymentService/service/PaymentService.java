@@ -45,6 +45,9 @@ import java.util.stream.Collectors;
  * wallet-service down -> offline queue mein daal do
  * ================================================================
  */
+import com.paymentService.feign.AmlServiceClient;
+import com.paymentService.feign.RiskServiceClient;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -54,6 +57,8 @@ public class PaymentService {
     private final PaymentKafkaProducer kafkaProducer;
     private final PaymentSignatureUtil signatureUtil;
     private final WalletServiceClient walletServiceClient;
+    private final RiskServiceClient riskServiceClient;
+    private final AmlServiceClient amlServiceClient;
 
     @Transactional
     @CircuitBreaker(name = "walletService", fallbackMethod = "initiatePaymentFallback")
@@ -74,6 +79,42 @@ public class PaymentService {
         String paymentId = generatePaymentId();
         String signature = signatureUtil.sign(buildSignaturePayload(paymentId, senderId, request));
 
+        // Synchronous SentinelX Pre-Debit Risk & AML Screening
+        double riskScore = 0.0;
+        boolean blocked = false;
+        String blockReason = null;
+
+        try {
+            RiskServiceClient.RiskScoringResponse riskResp = riskServiceClient.scoreTransaction("internal-key",
+                    new RiskServiceClient.RiskScoringRequest(
+                            paymentId, senderId.toString(), request.getSenderUpiId(), request.getReceiverUpiId(),
+                            request.getAmount(), "DEV_DEFAULT", "127.0.0.1", "MUMBAI", "PAYMENT"
+                    ));
+            if (riskResp != null) {
+                riskScore = riskResp.finalScore();
+                if (!riskResp.allowed() || riskScore > 0.7 || "HIGH".equalsIgnoreCase(riskResp.riskLevel()) || "CRITICAL".equalsIgnoreCase(riskResp.riskLevel())) {
+                    blocked = true;
+                    blockReason = "Risk score too high: " + riskScore + " (" + riskResp.riskLevel() + ")";
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Risk screening fallback triggered: {}", e.getMessage());
+        }
+
+        try {
+            AmlServiceClient.AmlScreeningResponse amlResp = amlServiceClient.screenTransaction("internal-key",
+                    new AmlServiceClient.AmlScreeningRequest(
+                            paymentId, request.getSenderUpiId(), request.getReceiverUpiId(),
+                            "User_" + senderId, request.getAmount(), "127.0.0.1"
+                    ));
+            if (amlResp != null && (!amlResp.allowed() || "BLOCKED".equalsIgnoreCase(amlResp.status()))) {
+                blocked = true;
+                blockReason = "AML compliance blocked: " + amlResp.reasons();
+            }
+        } catch (Exception e) {
+            log.warn("AML screening fallback triggered: {}", e.getMessage());
+        }
+
         Payment payment = Payment.builder()
                 .paymentId(paymentId)
                 .senderId(senderId)
@@ -81,15 +122,23 @@ public class PaymentService {
                 .senderUpiId(request.getSenderUpiId())
                 .receiverUpiId(request.getReceiverUpiId())
                 .amount(request.getAmount())
-                .paymentStatus(Payment.PaymentStatus.INITIATED)
+                .paymentStatus(blocked ? Payment.PaymentStatus.FAILED : Payment.PaymentStatus.INITIATED)
                 .paymentMode(Payment.PaymentMode.UPI)
                 .description(request.getDescription())
                 .signature(signature)
                 .idempotencyKey(idempotencyKey)
-                .fraudStatus(Payment.FraudStatus.SAFE)
+                .fraudScore(riskScore)
+                .fraudStatus(blocked ? Payment.FraudStatus.BLOCKED : (riskScore > 0.3 ? Payment.FraudStatus.REVIEW : Payment.FraudStatus.SAFE))
+                .failureReason(blocked ? blockReason : null)
                 .build();
 
         payment = paymentRepository.save(payment);
+
+        if (blocked) {
+            log.warn("Payment {} blocked by SentinelX Risk/AML engine: {}", paymentId, blockReason);
+            throw new PaymentException("Payment blocked by SentinelX Risk & AML engine: " + blockReason, "RISK_BLOCKED", HttpStatus.FORBIDDEN);
+        }
+
         kafkaProducer.publishPaymentInitiated(PaymentEvent.fromPayment(payment));
         log.info("Payment initiated successfully: {}", paymentId);
         return PaymentResponse.fromPayment(payment);

@@ -14,6 +14,8 @@ public interface ReconciliationDiscrepancyRepository extends JpaRepository<Recon
 
     List<ReconciliationDiscrepancy> findByReportId(String reportId);
 
+    Optional<ReconciliationDiscrepancy> findByDiscrepancyId(String discrepancyId);
+
     Optional<ReconciliationDiscrepancy> findByTransactionId(String transactionId);
 
     List<ReconciliationDiscrepancy> findByReportIdAndStatus(String reportId, ReconciliationStatus status);

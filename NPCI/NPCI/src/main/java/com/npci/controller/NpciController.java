@@ -55,7 +55,7 @@ public class NpciController {
      */
     @PostMapping("/initiate-transaction")
     public ResponseEntity<ApiResponse<TransactionResponse>> initiateTransaction(
-            @Valid @RequestBody InitiateTransactionRequest request) {
+            @Valid @RequestBody InitiateTransactionRequest request) throws InvalidTransactionException {
 
         log.info("Initiating transaction | sender={} | receiver={} | amount={}",
                 request.getSenderUpiId(), request.getReceiverUpiId(), request.getAmount());

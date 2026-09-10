@@ -248,4 +248,10 @@ public class BankAccountService {
                 .linkedAt(account.getLinkedAt())
                 .build();
     }
+
+    public LinkedBankAccount getPrimaryAccount(String userUpiId) {
+        return accountRepo.findByUserUpiIdAndIsPrimaryTrue(userUpiId)
+                .orElseGet(() -> accountRepo.findByUserUpiIdAndStatus(userUpiId, LinkStatus.ACTIVE)
+                        .stream().findFirst().orElse(null));
+    }
 }

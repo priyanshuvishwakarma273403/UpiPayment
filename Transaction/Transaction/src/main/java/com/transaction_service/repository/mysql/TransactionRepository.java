@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -46,6 +47,6 @@ public interface TransactionRepository extends JpaRepository<Transaction,Long> {
 
     // Fetch only DEBIT transactions within a specific timestamp range
     @Query("SELECT t FROM Transaction t WHERE t.transactionType = 'DEBIT' AND t.createdAt BETWEEN :from AND :to")
-    List<Transaction> findDebitTransactionsBetween(org.springframework.data.repository.query.Param("from") LocalDateTime from, org.springframework.data.repository.query.Param("to") LocalDateTime to);
+    List<Transaction> findDebitTransactionsBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
 }

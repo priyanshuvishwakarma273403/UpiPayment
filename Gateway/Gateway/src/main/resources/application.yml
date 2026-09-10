@@ -84,7 +84,7 @@ spring:
         - id: transaction-service
           uri: lb://transaction-service
           predicates:
-            - Path=/transactions/**
+            - Path=/transactions/**, /transaction/**
           filters:
             - name: RequestRateLimiter
               args:
@@ -131,6 +131,90 @@ spring:
           uri: lb://sync-service
           predicates:
             - Path=/sync/**
+
+        # ---- BANK GATEWAY SERVICE ----
+        - id: bank-gateway-service
+          uri: lb://bank-gateway-service
+          predicates:
+            - Path=/bank/**
+
+        # ---- SETTLEMENT SERVICE ----
+        - id: settlement-service
+          uri: lb://settlement-service
+          predicates:
+            - Path=/settlement/**
+
+        # ---- RECONCILIATION SERVICE ----
+        - id: reconciliation-service
+          uri: lb://reconciliation-service
+          predicates:
+            - Path=/reconciliation/**
+
+        # ---- KYC SERVICE ----
+        - id: kyc-service
+          uri: lb://kyc-service
+          predicates:
+            - Path=/kyc/**
+
+        # ---- AML SERVICE ----
+        - id: aml-service
+          uri: lb://aml-service
+          predicates:
+            - Path=/aml/**
+
+        # ---- RISK SCORING SERVICE ----
+        - id: risk-scoring-service
+          uri: lb://risk-scoring-service
+          predicates:
+            - Path=/risk/**
+
+        # ---- SUBSCRIPTION SERVICE ----
+        - id: subscription-service
+          uri: lb://subscription-service
+          predicates:
+            - Path=/subscription/**
+
+        # ---- INVOICE SERVICE ----
+        - id: invoice-service
+          uri: lb://invoice-service
+          predicates:
+            - Path=/invoice/**
+
+        # ---- DISPUTE SERVICE ----
+        - id: dispute-service
+          uri: lb://dispute-service
+          predicates:
+            - Path=/dispute/**
+
+        # ---- REWARDS SERVICE ----
+        - id: rewards-service
+          uri: lb://rewards-service
+          predicates:
+            - Path=/rewards/**
+
+        # ---- LOAN SERVICE ----
+        - id: loan-service
+          uri: lb://loan-service
+          predicates:
+            - Path=/loan/**
+
+        # ---- REFERRAL SERVICE ----
+        - id: referral-service
+          uri: lb://referral-service
+          predicates:
+            - Path=/referral/**
+
+        # ---- NPCI INTEGRATION SERVICE ----
+        - id: npci-integration-service
+          uri: lb://npci-integration-service
+          predicates:
+            - Path=/npci/**
+
+        # ---- NOTIFICATION SERVICE ----
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/notification/**
 
       # Default filters for ALL routes
       default-filters:

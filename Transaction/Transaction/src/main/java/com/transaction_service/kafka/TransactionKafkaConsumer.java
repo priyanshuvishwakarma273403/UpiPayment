@@ -27,6 +27,7 @@ public class TransactionKafkaConsumer {
 
     private final TransactionService transactionService;
     private final ObjectMapper objectMapper;
+    private final java.util.Set<String> processedEvents = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
     @KafkaListener(topics = "payment_completed", groupId = "transaction-completed-group",
             containerFactory = "kafkaListenerContainerFactory")
@@ -34,7 +35,17 @@ public class TransactionKafkaConsumer {
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> event = objectMapper.readValue(message, Map.class);
-            log.info("Recording completed payment: {}", event.get("paymentId"));
+            String paymentId = (String) event.get("paymentId");
+            String eventId = (String) event.getOrDefault("eventId", paymentId);
+            String correlationId = (String) event.getOrDefault("correlationId", paymentId);
+
+            if (!processedEvents.add("txn:completed:" + eventId + ":" + paymentId)) {
+                log.warn("[{}] Duplicate completed payment event skipped | eventId={} | paymentId={}", correlationId, eventId, paymentId);
+                ack.acknowledge();
+                return;
+            }
+
+            log.info("[{}] Recording completed payment: paymentId={}, eventId={}", correlationId, paymentId, eventId);
             transactionService.recordCompletedPayment(event);
             ack.acknowledge();
         } catch (Exception e) {

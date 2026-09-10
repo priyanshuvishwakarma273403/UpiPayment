@@ -1,3 +1,4 @@
+com\riskService\kafka\RiskKafkaConsumer.class
 com\upimesh\risk\model\converter\JsonSetConverter$1.class
 com\upimesh\risk\model\converter\JsonSetConverter.class
 com\upimesh\risk\config\SecurityConfig$InternalKeyFilter.class

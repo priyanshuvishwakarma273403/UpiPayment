@@ -40,6 +40,8 @@ public class WalletKafkaConsumer {
     private static final String TOPIC_PAYMENT_COMPLETED = "payment_completed";
     private static final String TOPIC_PAYMENT_FAILED    = "payment_failed";
 
+    private final java.util.Set<String> processedEvents = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
     /**
      * payment_initiated topic consume karo aur wallet debit+credit karo
      */
@@ -55,13 +57,22 @@ public class WalletKafkaConsumer {
             @SuppressWarnings("unchecked")
             Map<String, Object> event = objectMapper.readValue(message, Map.class);
             paymentId        = (String) event.get("paymentId");
+            String eventId   = (String) event.getOrDefault("eventId", paymentId);
+            String correlationId = (String) event.getOrDefault("correlationId", paymentId);
             Long senderId    = Long.valueOf(event.get("senderId").toString());
             Long receiverId  = Long.valueOf(event.get("receiverId").toString());
             BigDecimal amount = new BigDecimal(event.get("amount").toString());
             String fraudStatus = (String) event.getOrDefault("fraudStatus", "SAFE");
 
-            log.info("Processing wallet for paymentId={}, senderId={}, receiverId={}, amount={}",
-                    paymentId, senderId, receiverId, amount);
+            // Idempotency check: duplicate event skip karo
+            if (!processedEvents.add("evt:" + eventId + ":" + paymentId)) {
+                log.warn("[{}] Duplicate event skipped in Wallet | eventId={} | paymentId={}", correlationId, eventId, paymentId);
+                ack.acknowledge();
+                return;
+            }
+
+            log.info("[{}] Processing wallet for paymentId={}, senderId={}, receiverId={}, amount={}",
+                    correlationId, paymentId, senderId, receiverId, amount);
 
             // Fraud blocked hai to process mat karo
             if ("BLOCKED".equals(fraudStatus)) {

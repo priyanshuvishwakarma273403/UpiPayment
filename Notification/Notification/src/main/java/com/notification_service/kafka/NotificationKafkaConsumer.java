@@ -32,6 +32,8 @@ public class NotificationKafkaConsumer {
     private final ObjectMapper objectMapper;
     private final AuthServiceClient authServiceClient;
 
+    private final java.util.Set<String> processedEvents = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
     @KafkaListener(topics = "payment_completed", groupId = "notification-completed-group",
     containerFactory = "kafkaListenerContainerFactory")
     public void handlePaymentCompleted(String message,
@@ -39,6 +41,12 @@ public class NotificationKafkaConsumer {
 
         try{
             NotificationDto dto = parseEvent(message);
+            String eventKey = "notif:completed:" + dto.getPaymentId();
+            if (!processedEvents.add(eventKey)) {
+                log.warn("Duplicate notification event skipped | key={}", eventKey);
+                ack.acknowledge();
+                return;
+            }
             log.info("payment_completed notification: paymentId={}", dto.getPaymentId());
             emailService.sendPaymentSuccessToSender(dto);
             emailService.sendPaymentReceiverToReceiver(dto);

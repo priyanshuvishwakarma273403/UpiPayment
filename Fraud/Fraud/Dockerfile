@@ -15,4 +15,8 @@ COPY --from=builder /app/target/*.jar app.jar
 RUN chown -R appuser:appgroup /app
 USER appuser
 EXPOSE 8086
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:8086/actuator/health || exit 1
+
 ENTRYPOINT ["java", "-Xms128m", "-Xmx256m", "-jar", "app.jar"]

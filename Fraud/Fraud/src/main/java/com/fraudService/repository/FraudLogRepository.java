@@ -17,6 +17,8 @@ public interface FraudLogRepository extends MongoRepository<FraudLog, String> {
 
     Optional<FraudLog> findByPaymentId(String paymentId);
 
+    List<FraudLog> findByInvestigationStatusOrderByCheckedAtDesc(String investigationStatus);
+
     List<FraudLog> findBySenderIdOrderByCheckedAtDesc(Long senderId);
 
     // BLOCKED fraud logs
@@ -35,4 +37,10 @@ public interface FraudLogRepository extends MongoRepository<FraudLog, String> {
     List<FraudLog> findRepeatedTransactions(
             Long senderId, String receiverUpiId,
             java.math.BigDecimal amount, LocalDateTime since);
+
+    List<FraudLog> findByDeviceId(String deviceId);
+
+    List<FraudLog> findByIpAddress(String ipAddress);
+
+    List<FraudLog> findByReceiverUpiId(String receiverUpiId);
 }

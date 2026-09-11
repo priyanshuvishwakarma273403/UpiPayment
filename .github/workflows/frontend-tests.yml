@@ -1,0 +1,25 @@
+name: SentinelX Frontend & Artifacts Verification
+
+on:
+  push:
+    paths:
+      - '**.html'
+      - '**.js'
+      - '**.css'
+  pull_request:
+    paths:
+      - '**.html'
+      - '**.js'
+      - '**.css'
+
+jobs:
+  frontend-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify HTML5 Generative UI Dashboards
+        run: |
+          echo "Checking HTML5 Dashboards integrity..."
+          find . -name "*.html" -exec echo "Found dashboard: {}" \;

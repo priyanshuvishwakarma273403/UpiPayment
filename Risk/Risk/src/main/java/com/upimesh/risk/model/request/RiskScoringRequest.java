@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,6 +13,7 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class RiskScoringRequest {
 
     @NotBlank(message = "Transaction ID is required")
@@ -36,9 +38,13 @@ public class RiskScoringRequest {
     @NotBlank(message = "IP Address is required")
     private String ipAddress;
 
-    @NotBlank(message = "City is required")
     private String city;
 
-    @NotBlank(message = "Transaction Type is required")
+    private String location;
+
     private String transactionType;
+
+    private String merchantId;
+
+    private String merchantCategory;
 }

@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'sentinelx-fraud-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['localhost:8088']
+
+  - job_name: 'sentinelx-gateway-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['localhost:8080']
+
+  - job_name: 'sentinelx-transaction-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['localhost:8081']
+
+  - job_name: 'sentinelx-risk-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['localhost:8085']
+
+  - job_name: 'sentinelx-ml-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:8000']

@@ -1,24 +1,23 @@
 package com.upimesh.risk.service;
 
-import com.upimesh.risk.model.dto.AmountResult;
-import com.upimesh.risk.model.dto.DeviceResult;
-import com.upimesh.risk.model.dto.LocationResult;
-import com.upimesh.risk.model.dto.TimeResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.upimesh.risk.config.RiskThresholdConfig;
 import com.upimesh.risk.model.entity.RiskProfile;
 import com.upimesh.risk.model.entity.RiskScoringResult;
+import com.upimesh.risk.model.enums.RiskDecision;
 import com.upimesh.risk.model.enums.RiskFactor;
 import com.upimesh.risk.model.enums.RiskLevel;
 import com.upimesh.risk.model.request.RiskScoringRequest;
 import com.upimesh.risk.model.response.RiskScoringResponse;
 import com.upimesh.risk.repository.RiskProfileRepository;
 import com.upimesh.risk.repository.RiskScoringResultRepository;
+import com.upimesh.risk.rule.RiskRule;
+import com.upimesh.risk.rule.RuleEvaluationResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,130 +30,134 @@ public class RiskScoringService {
 
     private final RiskProfileRepository profileRepository;
     private final RiskScoringResultRepository scoringResultRepository;
-
-    private final DeviceFingerprintService deviceFingerprintService;
-    private final LocationAnalysisService locationAnalysisService;
-    private final BehavioralAnalysisService behavioralAnalysisService;
+    private final List<RiskRule> riskRules;
+    private final RiskThresholdConfig thresholdConfig;
+    private final ObjectMapper objectMapper;
     private final RiskProfileUpdater riskProfileUpdater;
-
-    @Value("${risk.threshold.low:0.3}")
-    private double lowThreshold;
-
-    @Value("${risk.threshold.high:0.7}")
-    private double highThreshold;
 
     @Transactional
     public RiskScoringResponse scoreTransaction(RiskScoringRequest request) {
         String scoringId = UUID.randomUUID().toString();
-        log.info("Calculating risk score for transaction: {} of user: {}", request.getTransactionId(), request.getUserId());
+        log.info("Evaluating real-time risk score for transaction: {} (user: {})", request.getTransactionId(), request.getUserId());
 
-        // 1. Get or build temporary baseline profile
-        RiskProfile profile = profileRepository.findByUserId(request.getUserId())
-                .orElse(null);
-        double baseScore = profile != null ? profile.getBaseRiskScore() : 0.1;
+        RiskProfile profile = profileRepository.findByUserId(request.getUserId()).orElse(null);
 
-        double finalScore = baseScore;
+        double compositeScore = 0.0;
+        List<RuleEvaluationResult> ruleDetails = new ArrayList<>();
         List<RiskFactor> factorsTriggered = new ArrayList<>();
 
-        // 2. Device Fingerprint Check
-        DeviceResult deviceResult = deviceFingerprintService.analyzeDevice(request.getDeviceId(), request.getUserId());
-        finalScore += deviceResult.scoreContribution();
-        if (deviceResult.isNew()) {
-            factorsTriggered.add(RiskFactor.NEW_DEVICE);
+        // Evaluate all independent RiskRule strategy beans
+        for (RiskRule rule : riskRules) {
+            try {
+                RuleEvaluationResult result = rule.evaluate(request, profile);
+                ruleDetails.add(result);
+
+                if (result.isTriggered()) {
+                    compositeScore += result.getScoreContribution();
+                    try {
+                        RiskFactor factor = RiskFactor.valueOf(result.getRuleId().replace("RULE_", ""));
+                        factorsTriggered.add(factor);
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception e) {
+                log.error("Error evaluating rule {}: {}", rule.getRuleId(), e.getMessage());
+            }
         }
 
-        // 3. Location Anomaly Check
-        LocationResult locationResult = locationAnalysisService.analyzeLocation(request.getCity(), request.getUserId());
-        finalScore += locationResult.scoreContribution();
-        if (locationResult.isAnomaly()) {
-            factorsTriggered.add(RiskFactor.LOCATION_ANOMALY);
+        // Bound composite score between 0.0 and 100.0
+        compositeScore = Math.min(100.0, Math.max(0.0, compositeScore));
+
+        // Determine Risk Decision based on configurable thresholds
+        RiskDecision decision;
+        if (compositeScore < thresholdConfig.getAllowThreshold()) {
+            decision = RiskDecision.ALLOW;
+        } else if (compositeScore < thresholdConfig.getMonitorThreshold()) {
+            decision = RiskDecision.MONITOR;
+        } else if (compositeScore < thresholdConfig.getStepUpThreshold()) {
+            decision = RiskDecision.STEP_UP;
+        } else if (compositeScore < thresholdConfig.getReviewThreshold()) {
+            decision = RiskDecision.REVIEW;
+        } else {
+            decision = RiskDecision.BLOCK;
         }
 
-        // 4. Time Pattern Check
-        int currentHour = LocalDateTime.now().getHour();
-        TimeResult timeResult = behavioralAnalysisService.analyzeTimePattern(currentHour, request.getUserId());
-        finalScore += timeResult.scoreContribution();
-        if (timeResult.isUnusual()) {
-            factorsTriggered.add(RiskFactor.UNUSUAL_HOUR);
-        }
-
-        // 5. Amount Pattern Check
-        AmountResult amountResult = behavioralAnalysisService.analyzeAmountPattern(request.getAmount(), request.getUserId());
-        finalScore += amountResult.scoreContribution();
-        if (amountResult.isUnusual()) {
-            factorsTriggered.add(RiskFactor.VELOCITY_HIGH);
-        }
-
-        // 6. High Value Check (> ₹50,000)
-        boolean isLargeAmount = request.getAmount().compareTo(BigDecimal.valueOf(50000)) > 0;
-        if (isLargeAmount) {
-            finalScore += 0.1;
-            factorsTriggered.add(RiskFactor.LARGE_AMOUNT);
-        }
-
-        // 7. New Receiver Check
-        List<RiskScoringResult> pastResults = scoringResultRepository.findByUserIdOrderByScoredAtDesc(request.getUserId());
-        boolean isNewReceiver = pastResults.stream()
-                .noneMatch(r -> request.getReceiverUpiId().equals(r.getReceiverUpiId()));
-        if (isNewReceiver && !pastResults.isEmpty()) {
-            finalScore += 0.1;
-            factorsTriggered.add(RiskFactor.NEW_RECEIVER);
-        }
-
-        // Cap risk score at 1.0
-        if (finalScore > 1.0) {
-            finalScore = 1.0;
-        }
-
-        // Determine Risk Level
+        // Map to RiskLevel enum
         RiskLevel riskLevel;
-        if (finalScore < lowThreshold) {
+        if (compositeScore < 20.0) {
             riskLevel = RiskLevel.LOW;
-        } else if (finalScore < 0.5) {
+        } else if (compositeScore < 50.0) {
             riskLevel = RiskLevel.MEDIUM;
-        } else if (finalScore < highThreshold) {
+        } else if (compositeScore < 80.0) {
             riskLevel = RiskLevel.HIGH;
         } else {
             riskLevel = RiskLevel.CRITICAL;
         }
 
-        boolean allowed = finalScore < highThreshold;
+        boolean allowed = (decision == RiskDecision.ALLOW || decision == RiskDecision.MONITOR);
 
-        // Save Scoring Result
-        RiskScoringResult result = RiskScoringResult.builder()
+        // Serialize rule evaluation breakdown for audit trace
+        String ruleDetailsJson;
+        try {
+            ruleDetailsJson = objectMapper.writeValueAsString(ruleDetails);
+        } catch (Exception e) {
+            log.warn("Failed to serialize rule details JSON: {}", e.getMessage());
+            ruleDetailsJson = "[]";
+        }
+
+        int currentHour = LocalDateTime.now().getHour();
+        int dayOfWeek = LocalDateTime.now().getDayOfWeek().getValue();
+
+        boolean isNewDevice = ruleDetails.stream()
+                .anyMatch(r -> "RULE_NEW_DEVICE".equals(r.getRuleId()) && r.isTriggered());
+        boolean locationAnomaly = ruleDetails.stream()
+                .anyMatch(r -> "RULE_LOCATION_DEVIATION".equals(r.getRuleId()) && r.isTriggered());
+        boolean velocityHigh = ruleDetails.stream()
+                .anyMatch(r -> "RULE_TRANSACTION_VELOCITY".equals(r.getRuleId()) && r.isTriggered());
+
+        // Save complete RiskScoringResult audit record
+        RiskScoringResult auditResult = RiskScoringResult.builder()
                 .scoringId(scoringId)
                 .transactionId(request.getTransactionId())
                 .userId(request.getUserId())
                 .userUpiId(request.getUserUpiId())
                 .receiverUpiId(request.getReceiverUpiId())
-                .finalScore(finalScore)
+                .finalScore(compositeScore)
                 .riskLevel(riskLevel)
+                .decision(decision)
                 .factorsTriggered(factorsTriggered)
+                .ruleDetailsJson(ruleDetailsJson)
+                .ruleVersion("v1.0.0")
                 .deviceId(request.getDeviceId())
                 .ipAddress(request.getIpAddress())
                 .hour(currentHour)
-                .dayOfWeek(LocalDateTime.now().getDayOfWeek().getValue())
-                .isNewDevice(deviceResult.isNew())
-                .locationAnomaly(locationResult.isAnomaly())
-                .velocityHigh(amountResult.isUnusual())
+                .dayOfWeek(dayOfWeek)
+                .isNewDevice(isNewDevice)
+                .locationAnomaly(locationAnomaly)
+                .velocityHigh(velocityHigh)
                 .build();
-        scoringResultRepository.save(result);
 
-        // Async update RiskProfile
-        riskProfileUpdater.updateRiskProfile(request.getUserId(), request, allowed);
+        scoringResultRepository.save(auditResult);
 
-        // Map triggers to string list for response payload
-        List<String> triggers = factorsTriggered.stream()
-                .map(Enum::name)
-                .toList();
+        // Update customer profile asynchronously
+        try {
+            riskProfileUpdater.updateRiskProfile(request.getUserId(), request, allowed);
+        } catch (Exception e) {
+            log.warn("Error updating risk profile for user {}: {}", request.getUserId(), e.getMessage());
+        }
+
+        List<String> factorNames = factorsTriggered.stream().map(Enum::name).toList();
 
         return RiskScoringResponse.builder()
                 .transactionId(request.getTransactionId())
                 .scoringId(scoringId)
-                .finalScore(finalScore)
+                .finalScore(compositeScore)
                 .riskLevel(riskLevel)
+                .decision(decision)
+                .actionRecommended(decision.name())
                 .allowed(allowed)
-                .factorsTriggered(triggers)
+                .factorsTriggered(factorNames)
+                .ruleDetails(ruleDetails)
+                .ruleVersion("v1.0.0")
                 .scoredAt(LocalDateTime.now())
                 .build();
     }

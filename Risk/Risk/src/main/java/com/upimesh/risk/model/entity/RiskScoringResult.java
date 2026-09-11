@@ -1,8 +1,9 @@
 package com.upimesh.risk.model.entity;
 
 import com.upimesh.risk.model.converter.JsonRiskFactorListConverter;
-import com.upimesh.risk.model.enums.RiskLevel;
+import com.upimesh.risk.model.enums.RiskDecision;
 import com.upimesh.risk.model.enums.RiskFactor;
+import com.upimesh.risk.model.enums.RiskLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -53,10 +54,21 @@ public class RiskScoringResult {
     @Column(nullable = false, length = 20)
     private RiskLevel riskLevel;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RiskDecision decision;
+
     @Convert(converter = JsonRiskFactorListConverter.class)
     @Column(columnDefinition = "TEXT")
     @Builder.Default
     private List<RiskFactor> factorsTriggered = new ArrayList<>();
+
+    @Column(columnDefinition = "TEXT")
+    private String ruleDetailsJson;
+
+    @Column(length = 20)
+    @Builder.Default
+    private String ruleVersion = "v1.0.0";
 
     @Column(length = 100)
     private String deviceId;

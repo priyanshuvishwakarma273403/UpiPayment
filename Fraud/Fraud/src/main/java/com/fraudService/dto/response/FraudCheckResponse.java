@@ -8,9 +8,6 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Fraud Check Response DTO
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,8 +16,15 @@ public class FraudCheckResponse {
 
     private String paymentId;
 
-    /** Final fraud decision */
+    /** Legacy fraud decision: SAFE / REVIEW / BLOCKED */
     private FraudDecision decision;
+
+    /** Granular decision: LOW RISK / SUSPICIOUS / HIGH RISK / REQUIRES INVESTIGATION */
+    private String intelligenceDecision;
+
+    private String riskLevel;
+
+    private Boolean allowed;
 
     /** Composite risk score: 0.0 (safe) to 1.0 (high risk) */
     private Double riskScore;
@@ -31,7 +35,7 @@ public class FraudCheckResponse {
     /** Human readable reasons (for audit) */
     private String reasons;
 
-    /** Individual rule results */
+    /** Individual rule details */
     private List<RuleDetail> ruleDetails;
 
     private LocalDateTime checkedAt;
@@ -55,5 +59,4 @@ public class FraudCheckResponse {
         private String reason;
         private Double score;
     }
-
 }

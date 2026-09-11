@@ -2,48 +2,54 @@ package com.fraudService.rules;
 
 import com.fraudService.dto.request.FraudCheckRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
 /**
- * ================================================================
- * Rapid Transaction Rule - Redis Based
- * ================================================================
- * 1 minute mein 5 se zyada transactions = Review
- * 1 minute mein 10 se zyada = Blocked
+ * Rapid Transaction Rule - Atomic Redis Based with Outage Resilience
  */
 @Component
 @RequiredArgsConstructor
-public class RapidTransactionRule implements FraudRule{
+@Slf4j
+public class RapidTransactionRule implements FraudRule {
 
     private final StringRedisTemplate redisTemplate;
 
-    private static final String PREFIX = "txn_count:";
+    private static final String PREFIX = "vel:cust:";
     private static final int REVIEW_LIMIT = 5;
     private static final int BLOCK_LIMIT = 10;
 
-
     @Override
     public RuleResult evaluate(FraudCheckRequest request) {
-        String key = PREFIX + request.getSenderId();
-        String countStr = redisTemplate.opsForValue().get(key);
-        int count  = countStr != null ? Integer.parseInt(countStr) : 0;
+        String key = PREFIX + request.getSenderId() + ":1m";
 
-        // Counter increment karo (1 minute TTL)
-        redisTemplate.opsForValue().increment(key);
-        redisTemplate.expire(key, Duration.ofMinutes(1));
+        try {
+            Long countLong = redisTemplate.opsForValue().increment(key);
+            long count = countLong != null ? countLong : 1L;
 
-        if(count >= BLOCK_LIMIT) {
-            return RuleResult.blocked("RapidTransactionRule",
-                    count + "transactions in 1 minute (limit : " + BLOCK_LIMIT + ")");
-        }
+            if (count == 1) {
+                redisTemplate.expire(key, Duration.ofMinutes(1));
+            }
 
-        if (count >= REVIEW_LIMIT) {
+            if (count >= BLOCK_LIMIT) {
+                return RuleResult.blocked("RapidTransactionRule",
+                        count + " transactions in 1 minute (limit: " + BLOCK_LIMIT + ")");
+            }
+
+            if (count >= REVIEW_LIMIT) {
+                return RuleResult.review("RapidTransactionRule",
+                        count + " transactions in 1 minute", 0.6);
+            }
+
+            return RuleResult.safe("RapidTransactionRule");
+
+        } catch (Exception e) {
+            log.warn("Redis outage in RapidTransactionRule: {}. Applying fallback review risk.", e.getMessage());
             return RuleResult.review("RapidTransactionRule",
-                    count + " transactions in 1 minute", 0.6);
+                    "Redis velocity tracking degraded due to outage: " + e.getMessage(), 0.3);
         }
-        return RuleResult.safe("RapidTransactionRule");
     }
 }

@@ -17,70 +17,81 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-/**
- * ================================================================
- * Fraud Controller - REST Endpoints
- * ================================================================
- * POST /fraud/check -> Manual fraud check (payment-service se Feign call)
- * GET  /fraud/logs/{paymentId} -> Payment fraud log
- * GET  /fraud/history/{senderId} -> User fraud history
- * GET  /fraud/high-risk -> High risk payments (admin)
- * ================================================================
- */
 @RestController
 @RequestMapping("/fraud")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Fraud Detection", description = "AI-powered fraud detection APIs")
+@Tag(name = "Fraud Detection", description = "Fraud Intelligence APIs")
 public class FraudController {
 
     private final FraudDetectionService fraudDetectionService;
     private final FraudLogRepository fraudLogRepository;
 
-    /**
-     * POST /fraud/check or /fraud/internal/check
-     * Manual fraud check (Kafka ke alawa direct call ke liye)
-     */
     @PostMapping({"/check", "/internal/check"})
-    @Operation(
-            summary = "Check payment for fraud",
-            description = "Run fraud detection rules + AI scoring. Returns SAFE/ REVIEW / BLOCKED."
-    )
-    public ResponseEntity<FraudCheckResponse> checkFraud(
-            @Valid @RequestBody FraudCheckRequest request){
-        log.info("Manual fraud check request for paymentId={}", request.getPaymentId());
+    @Operation(summary = "Check payment for fraud")
+    public ResponseEntity<FraudCheckResponse> checkFraud(@Valid @RequestBody FraudCheckRequest request) {
+        log.info("Fraud check request for paymentId={}", request.getPaymentId());
         FraudCheckResponse response = fraudDetectionService.checkFraud(request);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * GET /fraud/logs/{paymentId}
-     * Ek payment ka fraud check log
-     */
     @GetMapping("/logs/{paymentId}")
     @Operation(summary = "Get fraud log for a payment")
-    public ResponseEntity<FraudLog> getFraudLog(@PathVariable String paymentId){
+    public ResponseEntity<FraudLog> getFraudLog(@PathVariable String paymentId) {
         return fraudLogRepository.findByPaymentId(paymentId)
                 .map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * GET /fraud/history/{senderId}
-     * User ka fraud history
-     */
+    @GetMapping("/signals/{paymentId}")
+    @Operation(summary = "Get detailed fraud signals and evidence map for a payment")
+    public ResponseEntity<Map<String, Object>> getFraudSignals(@PathVariable String paymentId) {
+        return fraudLogRepository.findByPaymentId(paymentId)
+                .map(log -> ResponseEntity.ok(Map.<String, Object>of(
+                        "paymentId", log.getPaymentId(),
+                        "intelligenceDecision", log.getIntelligenceDecision() != null ? log.getIntelligenceDecision() : log.getFinalDecision(),
+                        "riskLevel", log.getRiskLevel() != null ? log.getRiskLevel() : "UNKNOWN",
+                        "riskScore", log.getRiskScore() != null ? log.getRiskScore() : 0.0,
+                        "evidence", log.getEvidenceMap() != null ? log.getEvidenceMap() : Map.of(),
+                        "reasons", log.getReasons() != null ? log.getReasons() : ""
+                )))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/history/{senderId}")
     @Operation(summary = "Get fraud history for a sender")
-    public ResponseEntity<List<FraudLog>> getFraudHistory(@PathVariable Long senderId){
+    public ResponseEntity<List<FraudLog>> getFraudHistory(@PathVariable Long senderId) {
         List<FraudLog> history = fraudLogRepository.findBySenderIdOrderByCheckedAtDesc(senderId);
         return ResponseEntity.ok(history);
     }
 
-    /**
-     * GET /fraud/high-risk?minScore=0.7&since=hours
-     * High risk payments (admin monitoring)
-     */
+    @GetMapping("/investigations")
+    @Operation(summary = "Get pending fraud investigation queue")
+    public ResponseEntity<List<FraudLog>> getPendingInvestigations() {
+        List<FraudLog> pending = fraudLogRepository.findByInvestigationStatusOrderByCheckedAtDesc("PENDING");
+        return ResponseEntity.ok(pending);
+    }
+
+    @PostMapping("/investigate/{paymentId}")
+    @Operation(summary = "Update fraud investigation status (CONFIRMED_FRAUD / DISMISSED_FALSE_POSITIVE)")
+    public ResponseEntity<Map<String, Object>> updateInvestigation(
+            @PathVariable String paymentId,
+            @RequestParam String status) {
+
+        return fraudLogRepository.findByPaymentId(paymentId)
+                .map(log -> {
+                    log.setInvestigationStatus(status.toUpperCase());
+                    fraudLogRepository.save(log);
+                    return ResponseEntity.ok(Map.<String, Object>of(
+                            "paymentId", paymentId,
+                            "investigationStatus", log.getInvestigationStatus(),
+                            "updatedAt", LocalDateTime.now().toString()
+                    ));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/high-risk")
-    @Operation(summary = "Get high-risk payments (admin - only )")
+    @Operation(summary = "Get high-risk payments")
     public ResponseEntity<List<FraudLog>> getHighRiskPayments(
             @RequestParam(defaultValue = "0.7") Double minScore,
             @RequestParam(defaultValue = "24") int sinceHours) {
@@ -90,10 +101,6 @@ public class FraudController {
         return ResponseEntity.ok(highRisk);
     }
 
-    /**
-     * GET /fraud/stats
-     * Fraud statistics summary
-     */
     @GetMapping("/stats")
     @Operation(summary = "Fraud detection statistics")
     public ResponseEntity<Map<String, Object>> getStats() {
@@ -112,5 +119,4 @@ public class FraudController {
                 "generatedAt", LocalDateTime.now().toString()
         ));
     }
-
 }

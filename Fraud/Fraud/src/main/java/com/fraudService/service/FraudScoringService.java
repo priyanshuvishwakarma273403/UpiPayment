@@ -1,30 +1,25 @@
 package com.fraudService.service;
 
 import com.fraudService.dto.request.FraudCheckRequest;
+import com.fraudService.dto.request.MlPredictionRequest;
+import com.fraudService.dto.response.MlPredictionResponse;
 import com.fraudService.repository.FraudLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-
 /**
  * ================================================================
- * AI Fraud Scoring Service
+ * AI & Machine Learning Fraud Scoring Service
  * ================================================================
- * Abhi yeh rule-based scoring implement karta hai.
- * Production mein yahan ML model (Python FastAPI) call hoga.
- *
- * Scoring factors:
- * 1. Transaction amount vs user's typical amount (30% weight)
- * 2. Fraud history of sender (25% weight)
- * 3. New receiver (15% weight)
- * 4. Time of day (10% weight)
- * 5. Transaction velocity (20% weight)
- *
- * Future: Spring AI / external ML model REST call
+ * Integrates independent Python FastAPI ML Microservice REST client
+ * with fallback heuristic scoring.
+ * ML provides a probabilistic risk signal; Java Risk orchestration
+ * executes the final controlled decision boundary.
  * ================================================================
  */
 
@@ -34,61 +29,83 @@ import java.time.LocalDateTime;
 public class FraudScoringService {
 
     private final FraudLogRepository fraudLogRepository;
+    private final RestTemplate restTemplate = new RestTemplate();
 
+    private static final String ML_SERVICE_PREDICT_URL = "http://localhost:8000/predict";
     private static final BigDecimal HIGH_AMOUNT_THRESHOLD = new BigDecimal("25000");
     private static final BigDecimal VERY_HIGH_AMOUNT_THRESHOLD = new BigDecimal("75000");
 
-
     /**
-     * AI fraud score calculate karo (0.0 = safe, 1.0 = definitely fraud)
+     * Calculate ML fraud score signal (0.0 = safe, 1.0 = high risk)
      */
-    public double calculateFraudScore(FraudCheckRequest request){
+    public double calculateFraudScore(FraudCheckRequest request) {
+        try {
+            MlPredictionRequest mlReq = extractFeatures(request);
+            MlPredictionResponse mlRes = restTemplate.postForObject(
+                    ML_SERVICE_PREDICT_URL, mlReq, MlPredictionResponse.class);
 
-        double score = 0.0;
+            if (mlRes != null && mlRes.getFraudProbability() != null) {
+                log.info("ML Service prediction received for paymentId={}: prob={}, model={}, confidence={}",
+                        request.getPaymentId(), mlRes.getFraudProbability(), mlRes.getModelVersion(), mlRes.getConfidence());
+                return mlRes.getFraudProbability();
+            }
+        } catch (Exception e) {
+            log.warn("ML Service unavailable/failed for paymentId={}: {}. Falling back to heuristic AI scoring.",
+                    request.getPaymentId(), e.getMessage());
+        }
 
-        // Factor 1: Amount analysis (30% weight)
-        score += calculateAmountScore(request.getAmount()) * 0.30;
-
-        // Factor 2: Sender fraud history (25% weight)
-        score += calculateHistoryScore(request.getSenderId()) * 0.25;
-
-        // Factor 3: New vs known receiver (15% weight)
-        score += calculateReceiverScore(request.getSenderId(), request.getReceiverUpiId()) * 0.15;
-
-        // Factor 4: Time of day (10% weight)
-        score += calculateTimeScore() * 0.10;
-
-        // Factor 5: Transaction velocity from Redis (20% weight)
-        // (Redis check RapidTransactionRule mein hota hai, yahan simulate)
-        score += 0.0 * 0.20; // Placeholder
-
-        // Cap at 1.0
-        score = Math.min(score, 1.0);
-
-        log.debug("AI fraud score for payment={}: {}", request.getPaymentId(), score);
-        return Math.round(score * 100.0) / 100.0;
-
+        // Heuristic AI Fallback Scoring
+        return calculateHeuristicScore(request);
     }
 
-    /** Amount-based scoring */
-    private double calculateAmountScore(BigDecimal amount){
-        if(amount.compareTo(VERY_HIGH_AMOUNT_THRESHOLD) >= 0) return 0.8;
-        if(amount.compareTo(HIGH_AMOUNT_THRESHOLD) >= 0) return 0.5;
-        if(amount.compareTo(new BigDecimal("10000")) >= 0) return 0.3;
+    private MlPredictionRequest extractFeatures(FraudCheckRequest request) {
+        double amountDev = calculateAmountScore(request.getAmount());
+        double historyScore = calculateHistoryScore(request.getSenderId());
+        double receiverScore = calculateReceiverScore(request.getSenderId(), request.getReceiverUpiId());
+        double timeScore = calculateTimeScore();
+
+        return MlPredictionRequest.builder()
+                .amountDeviation(amountDev * 5.0)
+                .velocity1m(1.0)
+                .deviceAgeDays(30.0)
+                .accountAgeDays(180.0)
+                .merchantRiskScore(0.20)
+                .beneficiaryHistoryCount(receiverScore < 0.1 ? 5.0 : 0.0)
+                .behavioralDeviation(timeScore)
+                .graphClusterDensity(historyScore)
+                .build();
+    }
+
+    private double calculateHeuristicScore(FraudCheckRequest request) {
+        double score = 0.0;
+        score += calculateAmountScore(request.getAmount()) * 0.30;
+        score += calculateHistoryScore(request.getSenderId()) * 0.25;
+        score += calculateReceiverScore(request.getSenderId(), request.getReceiverUpiId()) * 0.15;
+        score += calculateTimeScore() * 0.10;
+
+        score = Math.min(score, 1.0);
+        return Math.round(score * 100.0) / 100.0;
+    }
+
+    private double calculateAmountScore(BigDecimal amount) {
+        if (amount == null) return 0.0;
+        if (amount.compareTo(VERY_HIGH_AMOUNT_THRESHOLD) >= 0) return 0.8;
+        if (amount.compareTo(HIGH_AMOUNT_THRESHOLD) >= 0) return 0.5;
+        if (amount.compareTo(new BigDecimal("10000")) >= 0) return 0.3;
         return 0.0;
     }
 
-    /** Sender ka fraud history score */
-    private double calculateHistoryScore(Long senderId){
+    private double calculateHistoryScore(Long senderId) {
+        if (senderId == null) return 0.0;
         try {
             long blockedCount = fraudLogRepository.countBySenderIdAndFinalDecisionAndCheckedAtAfter(
                     senderId, "BLOCKED", LocalDateTime.now().minusDays(30));
-            if (blockedCount >= 3)  return 0.9;
-            if (blockedCount >= 1)  return 0.5;
+            if (blockedCount >= 3) return 0.9;
+            if (blockedCount >= 1) return 0.5;
 
             long reviewCount = fraudLogRepository.countBySenderIdAndFinalDecisionAndCheckedAtAfter(
                     senderId, "REVIEW", LocalDateTime.now().minusDays(7));
-            if (reviewCount >= 2)   return 0.4;
+            if (reviewCount >= 2) return 0.4;
             return 0.0;
         } catch (Exception e) {
             log.warn("Could not fetch fraud history for sender {}: {}", senderId, e.getMessage());
@@ -96,26 +113,22 @@ public class FraudScoringService {
         }
     }
 
-    /** Receiver new hai ya known */
-    private double calculateReceiverScore(Long senderId, String receiverUpiId){
-        try{
-            // Agar pehle kabhi is receiver ko payment ki hai, low risk
+    private double calculateReceiverScore(Long senderId, String receiverUpiId) {
+        if (senderId == null || receiverUpiId == null) return 0.1;
+        try {
             long previousTxns = fraudLogRepository
                     .findRepeatedTransactions(senderId, receiverUpiId,
                             BigDecimal.ZERO, LocalDateTime.now().minusDays(90))
                     .size();
-            return previousTxns > 0 ? 0.0 : 0.2; //  New receiver = slightly higher risk
-        }catch(Exception e){
+            return previousTxns > 0 ? 0.0 : 0.2;
+        } catch (Exception e) {
             return 0.1;
         }
     }
 
-    /** Time-based risk */
     private double calculateTimeScore() {
         int hour = LocalDateTime.now().getHour();
-        // 1AM - 5AM = higher risk
         if (hour >= 1 && hour <= 5) return 0.4;
-        // 11PM - 1AM = moderate risk
         if (hour >= 23 || hour == 0) return 0.2;
         return 0.0;
     }

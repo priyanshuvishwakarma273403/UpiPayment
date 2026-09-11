@@ -10,24 +10,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
-
-/**
- * ================================================================
- * FraudLog - MongoDB Document
- * ================================================================
- * Collection: fraud_logs
- *
- * Har payment ke fraud check ka complete record yahan store hoga.
- * MongoDB use karne ke reasons:
- * 1. Schema-flexible: Rules change hone par columns add karne ki
- *    zarurat nahi
- * 2. Rich queries: Fraud patterns dhundne ke liye complex queries
- * 3. Fast writes: High volume payment events
- * 4. TTL index: 90 din purane logs auto-delete ho sakte hain
- * ================================================================
- */
-
+import java.util.Map;
 
 @Document(collection = "fraud_logs")
 @Data
@@ -50,9 +35,15 @@ public class FraudLog {
     private String receiverUpiId;
     private BigDecimal amount;
     private String paymentMode;
+    private String deviceId;
+    private String ipAddress;
 
     // Final fraud decision: SAFE / REVIEW / BLOCKED
     private String finalDecision;
+
+    // Fraud intelligence granular decision: LOW RISK / SUSPICIOUS / HIGH RISK / REQUIRES INVESTIGATION
+    private String intelligenceDecision;
+    private String riskLevel;
 
     // Composite risk score (0.0 - 1.0)
     private Double riskScore;
@@ -62,6 +53,15 @@ public class FraudLog {
 
     // Individual rule results
     private List<RuleResult> ruleResults;
+
+    private String fraudSignalsJson;
+
+    @Builder.Default
+    private Map<String, Object> evidenceMap = new HashMap<>();
+
+    // Investigation status: PENDING / CONFIRMED_FRAUD / DISMISSED_FALSE_POSITIVE
+    @Indexed
+    private String investigationStatus;
 
     // Human readable reasons
     private String reasons;

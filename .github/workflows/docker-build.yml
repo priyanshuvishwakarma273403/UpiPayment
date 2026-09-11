@@ -1,0 +1,26 @@
+name: SentinelX Docker Build Pipeline
+
+on:
+  push:
+    paths:
+      - '**/Dockerfile'
+      - 'MlService/**'
+      - 'Fraud/**'
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Fraud Service Image
+        run: |
+          docker build -t sentinelx/fraud-service:latest -f Fraud/Fraud/Dockerfile Fraud/Fraud
+
+      - name: Build ML Service Image
+        run: |
+          docker build -t sentinelx/ml-service:latest -f MlService/Dockerfile MlService

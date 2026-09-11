@@ -1,34 +1,34 @@
 package com.upimesh.risk.service;
 
-import com.upimesh.risk.model.dto.AmountResult;
-import com.upimesh.risk.model.dto.DeviceResult;
-import com.upimesh.risk.model.dto.LocationResult;
-import com.upimesh.risk.model.dto.TimeResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.upimesh.risk.config.RiskThresholdConfig;
 import com.upimesh.risk.model.entity.RiskProfile;
-import com.upimesh.risk.model.entity.RiskScoringResult;
+import com.upimesh.risk.model.enums.RiskDecision;
 import com.upimesh.risk.model.enums.RiskLevel;
 import com.upimesh.risk.model.request.RiskScoringRequest;
 import com.upimesh.risk.model.response.RiskScoringResponse;
 import com.upimesh.risk.repository.RiskProfileRepository;
 import com.upimesh.risk.repository.RiskScoringResultRepository;
+import com.upimesh.risk.rule.RiskRule;
+import com.upimesh.risk.rule.impl.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
-import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class RiskScoringServiceTest {
+class RiskScoringServiceTest {
 
     @Mock
     private RiskProfileRepository profileRepository;
@@ -37,214 +37,164 @@ public class RiskScoringServiceTest {
     private RiskScoringResultRepository scoringResultRepository;
 
     @Mock
-    private DeviceFingerprintService deviceFingerprintService;
-
-    @Mock
-    private LocationAnalysisService locationAnalysisService;
-
-    @Mock
-    private BehavioralAnalysisService behavioralAnalysisService;
-
-    @Mock
     private RiskProfileUpdater riskProfileUpdater;
 
-    @InjectMocks
+    @Mock
+    private RedisVelocityTracker velocityTracker;
+
     private RiskScoringService riskScoringService;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(riskScoringService, "lowThreshold", 0.3);
-        ReflectionTestUtils.setField(riskScoringService, "highThreshold", 0.7);
+        RiskThresholdConfig config = new RiskThresholdConfig();
+        config.setAllowThreshold(20.0);
+        config.setMonitorThreshold(40.0);
+        config.setStepUpThreshold(60.0);
+        config.setReviewThreshold(80.0);
+
+        lenient().when(velocityTracker.trackAndEvaluateVelocity(any(), any(), any(), any()))
+                .thenReturn(com.upimesh.risk.model.dto.VelocityResult.builder()
+                        .customerCount1m(1)
+                        .customerCount5m(1)
+                        .customerCount1h(1)
+                        .deviceCount1m(1)
+                        .deviceCount1h(1)
+                        .ipCount1m(1)
+                        .ipCount1h(1)
+                        .beneficiaryCount1m(1)
+                        .beneficiaryCount1h(1)
+                        .degraded(false)
+                        .build());
+
+        List<RiskRule> rules = List.of(
+                new AmountDeviationRule(),
+                new TransactionFrequencyVelocityRule(velocityTracker),
+                new NewDeviceRule(),
+                new NewBeneficiaryRule(),
+                new UnusualHoursRule(),
+                new LocationDeviationRule(),
+                new AccountAgeRule(),
+                new MerchantRiskRule(),
+                new PreviousFraudHistoryRule()
+        );
+
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        riskScoringService = new RiskScoringService(
+                profileRepository,
+                scoringResultRepository,
+                rules,
+                config,
+                objectMapper,
+                riskProfileUpdater
+        );
     }
 
     @Test
-    void testLowRiskPassesThrough() {
-        RiskScoringRequest request = new RiskScoringRequest("tx123", "user123", "sender@upimesh", "receiver@upimesh",
-                new BigDecimal("5000.00"), "dev123", "127.0.0.1", "Mumbai", "PAYMENT");
+    void testLowRiskTransactionAllowed() {
+        RiskScoringRequest request = RiskScoringRequest.builder()
+                .transactionId("TXN1001")
+                .userId("user123")
+                .userUpiId("user123@upimesh")
+                .receiverUpiId("merchant@upimesh")
+                .amount(new BigDecimal("500.00"))
+                .deviceId("DEV_KNOWN_1")
+                .ipAddress("127.0.0.1")
+                .city("Mumbai")
+                .transactionType("PAYMENT")
+                .build();
 
         RiskProfile profile = RiskProfile.builder()
                 .userId("user123")
+                .userUpiId("user123@upimesh")
+                .avgTransactionAmount(new BigDecimal("600.00"))
+                .knownDevices(Set.of("DEV_KNOWN_1"))
+                .usualCities(Set.of("Mumbai"))
                 .baseRiskScore(0.1)
+                .successfulTransactions(10)
                 .build();
 
         when(profileRepository.findByUserId("user123")).thenReturn(Optional.of(profile));
-        when(deviceFingerprintService.analyzeDevice(eq("dev123"), eq("user123")))
-                .thenReturn(new DeviceResult(false, 0.0));
-        when(locationAnalysisService.analyzeLocation(eq("Mumbai"), eq("user123")))
-                .thenReturn(new LocationResult(false, 0.0, "OK"));
-        when(behavioralAnalysisService.analyzeTimePattern(anyInt(), eq("user123")))
-                .thenReturn(new TimeResult(false, 0.0));
-        when(behavioralAnalysisService.analyzeAmountPattern(any(BigDecimal.class), eq("user123")))
-                .thenReturn(new AmountResult(false, 0.0));
-        when(scoringResultRepository.findByUserIdOrderByScoredAtDesc("user123"))
-                .thenReturn(Collections.emptyList());
 
         RiskScoringResponse response = riskScoringService.scoreTransaction(request);
 
         assertNotNull(response);
-        assertTrue(response.isAllowed());
+        assertEquals(RiskDecision.ALLOW, response.getDecision());
         assertEquals(RiskLevel.LOW, response.getRiskLevel());
-        assertEquals(0.1, response.getFinalScore());
-        verify(scoringResultRepository, times(1)).save(any(RiskScoringResult.class));
-        verify(riskProfileUpdater, times(1)).updateRiskProfile(eq("user123"), eq(request), eq(true));
+        assertTrue(response.isAllowed());
+        assertTrue(response.getFinalScore() < 20.0);
+        verify(scoringResultRepository, times(1)).save(any());
     }
 
     @Test
-    void testNewDeviceBoostTriggered() {
-        RiskScoringRequest request = new RiskScoringRequest("tx123", "user123", "sender@upimesh", "receiver@upimesh",
-                new BigDecimal("5000.00"), "newDev123", "127.0.0.1", "Mumbai", "PAYMENT");
+    void testNewDeviceAndLocationDeviationTriggersMonitorOrStepUp() {
+        RiskScoringRequest request = RiskScoringRequest.builder()
+                .transactionId("TXN1002")
+                .userId("user123")
+                .userUpiId("user123@upimesh")
+                .receiverUpiId("merchant@upimesh")
+                .amount(new BigDecimal("500.00"))
+                .deviceId("DEV_NEW_UNKNOWN")
+                .ipAddress("127.0.0.1")
+                .city("Delhi")
+                .transactionType("PAYMENT")
+                .build();
 
         RiskProfile profile = RiskProfile.builder()
                 .userId("user123")
+                .userUpiId("user123@upimesh")
+                .avgTransactionAmount(new BigDecimal("600.00"))
+                .knownDevices(Set.of("DEV_KNOWN_1"))
+                .usualCities(Set.of("Mumbai"))
                 .baseRiskScore(0.1)
+                .successfulTransactions(10)
                 .build();
 
         when(profileRepository.findByUserId("user123")).thenReturn(Optional.of(profile));
-        when(deviceFingerprintService.analyzeDevice(eq("newDev123"), eq("user123")))
-                .thenReturn(new DeviceResult(true, 0.2));
-        when(locationAnalysisService.analyzeLocation(eq("Mumbai"), eq("user123")))
-                .thenReturn(new LocationResult(false, 0.0, "OK"));
-        when(behavioralAnalysisService.analyzeTimePattern(anyInt(), eq("user123")))
-                .thenReturn(new TimeResult(false, 0.0));
-        when(behavioralAnalysisService.analyzeAmountPattern(any(BigDecimal.class), eq("user123")))
-                .thenReturn(new AmountResult(false, 0.0));
-        when(scoringResultRepository.findByUserIdOrderByScoredAtDesc("user123"))
-                .thenReturn(Collections.emptyList());
 
         RiskScoringResponse response = riskScoringService.scoreTransaction(request);
 
         assertNotNull(response);
-        assertTrue(response.isAllowed()); // 0.1 + 0.2 = 0.3 (LOW since threshold is 0.3)
-        assertEquals(0.3, response.getFinalScore(), 1e-4);
-        assertTrue(response.getFactorsTriggered().contains("NEW_DEVICE"));
-    }
-
-    @Test
-    void testLocationAnomalyDetected() {
-        RiskScoringRequest request = new RiskScoringRequest("tx123", "user123", "sender@upimesh", "receiver@upimesh",
-                new BigDecimal("5000.00"), "dev123", "127.0.0.1", "Delhi", "PAYMENT");
-
-        RiskProfile profile = RiskProfile.builder()
-                .userId("user123")
-                .baseRiskScore(0.1)
-                .build();
-
-        when(profileRepository.findByUserId("user123")).thenReturn(Optional.of(profile));
-        when(deviceFingerprintService.analyzeDevice(eq("dev123"), eq("user123")))
-                .thenReturn(new DeviceResult(false, 0.0));
-        when(locationAnalysisService.analyzeLocation(eq("Delhi"), eq("user123")))
-                .thenReturn(new LocationResult(true, 0.25, "Anomaly"));
-        when(behavioralAnalysisService.analyzeTimePattern(anyInt(), eq("user123")))
-                .thenReturn(new TimeResult(false, 0.0));
-        when(behavioralAnalysisService.analyzeAmountPattern(any(BigDecimal.class), eq("user123")))
-                .thenReturn(new AmountResult(false, 0.0));
-        when(scoringResultRepository.findByUserIdOrderByScoredAtDesc("user123"))
-                .thenReturn(Collections.emptyList());
-
-        RiskScoringResponse response = riskScoringService.scoreTransaction(request);
-
-        assertNotNull(response);
-        assertTrue(response.isAllowed()); // 0.1 + 0.25 = 0.35 (MEDIUM)
+        // New Device (+25) + Location Deviation (+20) = 45.0 => STEP_UP
+        assertEquals(RiskDecision.STEP_UP, response.getDecision());
         assertEquals(RiskLevel.MEDIUM, response.getRiskLevel());
-        assertEquals(0.35, response.getFinalScore(), 1e-4);
-        assertTrue(response.getFactorsTriggered().contains("LOCATION_ANOMALY"));
+        assertFalse(response.isAllowed()); // allowed is only for ALLOW & MONITOR
     }
 
     @Test
-    void testUnusualHoursBoostApplied() {
-        RiskScoringRequest request = new RiskScoringRequest("tx123", "user123", "sender@upimesh", "receiver@upimesh",
-                new BigDecimal("5000.00"), "dev123", "127.0.0.1", "Mumbai", "PAYMENT");
+    void testHighRiskMerchantAndFraudHistoryTriggersBlock() {
+        RiskScoringRequest request = RiskScoringRequest.builder()
+                .transactionId("TXN1003")
+                .userId("user123")
+                .userUpiId("user123@upimesh")
+                .receiverUpiId("gambling_site@upimesh")
+                .amount(new BigDecimal("50000.00"))
+                .deviceId("DEV_NEW_UNKNOWN")
+                .ipAddress("127.0.0.1")
+                .city("Delhi")
+                .merchantCategory("CASINO")
+                .transactionType("PAYMENT")
+                .build();
 
         RiskProfile profile = RiskProfile.builder()
                 .userId("user123")
-                .baseRiskScore(0.1)
+                .userUpiId("user123@upimesh")
+                .avgTransactionAmount(new BigDecimal("100.00")) // 500x average (+35)
+                .knownDevices(Set.of("DEV_KNOWN_1")) // New device (+25)
+                .usualCities(Set.of("Mumbai")) // Location anomaly (+20)
+                .baseRiskScore(0.8) // High base risk / fraud history (+40)
+                .successfulTransactions(1)
                 .build();
 
         when(profileRepository.findByUserId("user123")).thenReturn(Optional.of(profile));
-        when(deviceFingerprintService.analyzeDevice(eq("dev123"), eq("user123")))
-                .thenReturn(new DeviceResult(false, 0.0));
-        when(locationAnalysisService.analyzeLocation(eq("Mumbai"), eq("user123")))
-                .thenReturn(new LocationResult(false, 0.0, "OK"));
-        when(behavioralAnalysisService.analyzeTimePattern(anyInt(), eq("user123")))
-                .thenReturn(new TimeResult(true, 0.1));
-        when(behavioralAnalysisService.analyzeAmountPattern(any(BigDecimal.class), eq("user123")))
-                .thenReturn(new AmountResult(false, 0.0));
-        when(scoringResultRepository.findByUserIdOrderByScoredAtDesc("user123"))
-                .thenReturn(Collections.emptyList());
 
         RiskScoringResponse response = riskScoringService.scoreTransaction(request);
 
         assertNotNull(response);
-        assertTrue(response.isAllowed()); // 0.1 + 0.1 = 0.2 (LOW)
-        assertEquals(0.2, response.getFinalScore());
-        assertTrue(response.getFactorsTriggered().contains("UNUSUAL_HOUR"));
-    }
-
-    @Test
-    void testLargeAmountUnusualPattern() {
-        RiskScoringRequest request = new RiskScoringRequest("tx123", "user123", "sender@upimesh", "receiver@upimesh",
-                new BigDecimal("55000.00"), "dev123", "127.0.0.1", "Mumbai", "PAYMENT");
-
-        RiskProfile profile = RiskProfile.builder()
-                .userId("user123")
-                .baseRiskScore(0.1)
-                .build();
-
-        when(profileRepository.findByUserId("user123")).thenReturn(Optional.of(profile));
-        when(deviceFingerprintService.analyzeDevice(eq("dev123"), eq("user123")))
-                .thenReturn(new DeviceResult(false, 0.0));
-        when(locationAnalysisService.analyzeLocation(eq("Mumbai"), eq("user123")))
-                .thenReturn(new LocationResult(false, 0.0, "OK"));
-        when(behavioralAnalysisService.analyzeTimePattern(anyInt(), eq("user123")))
-                .thenReturn(new TimeResult(false, 0.0));
-        when(behavioralAnalysisService.analyzeAmountPattern(any(BigDecimal.class), eq("user123")))
-                .thenReturn(new AmountResult(true, 0.2));
-        when(scoringResultRepository.findByUserIdOrderByScoredAtDesc("user123"))
-                .thenReturn(Collections.emptyList());
-
-        RiskScoringResponse response = riskScoringService.scoreTransaction(request);
-
-        assertNotNull(response);
-        assertTrue(response.isAllowed()); // 0.1 + 0.2 (unusual amount) + 0.1 (large amount > 50k) = 0.4 (MEDIUM)
-        assertEquals(0.4, response.getFinalScore());
-        assertTrue(response.getFactorsTriggered().contains("VELOCITY_HIGH"));
-        assertTrue(response.getFactorsTriggered().contains("LARGE_AMOUNT"));
-    }
-
-    @Test
-    void testHighRiskBlocked() {
-        RiskScoringRequest request = new RiskScoringRequest("tx123", "user123", "sender@upimesh", "receiver@upimesh",
-                new BigDecimal("55000.00"), "newDev123", "127.0.0.1", "Delhi", "PAYMENT");
-
-        RiskProfile profile = RiskProfile.builder()
-                .userId("user123")
-                .baseRiskScore(0.1)
-                .build();
-
-        when(profileRepository.findByUserId("user123")).thenReturn(Optional.of(profile));
-        // new device (+0.2)
-        when(deviceFingerprintService.analyzeDevice(eq("newDev123"), eq("user123")))
-                .thenReturn(new DeviceResult(true, 0.2));
-        // location anomaly (+0.25)
-        when(locationAnalysisService.analyzeLocation(eq("Delhi"), eq("user123")))
-                .thenReturn(new LocationResult(true, 0.25, "Anomaly"));
-        // unusual timing (+0.05)
-        when(behavioralAnalysisService.analyzeTimePattern(anyInt(), eq("user123")))
-                .thenReturn(new TimeResult(true, 0.05));
-        // amount anomaly (+0.2)
-        when(behavioralAnalysisService.analyzeAmountPattern(any(BigDecimal.class), eq("user123")))
-                .thenReturn(new AmountResult(true, 0.2));
-        when(scoringResultRepository.findByUserIdOrderByScoredAtDesc("user123"))
-                .thenReturn(Collections.emptyList());
-
-        // Total score = 0.1 + 0.2 + 0.25 + 0.05 + 0.2 + 0.1 (large amount > 50k) = 0.9. Capped at 1.0.
-
-        RiskScoringResponse response = riskScoringService.scoreTransaction(request);
-
-        assertNotNull(response);
-        assertFalse(response.isAllowed()); // finalScore >= 0.7
+        assertEquals(RiskDecision.BLOCK, response.getDecision());
         assertEquals(RiskLevel.CRITICAL, response.getRiskLevel());
-        assertEquals(0.9, response.getFinalScore());
+        assertFalse(response.isAllowed());
+        assertEquals(100.0, response.getFinalScore());
         verify(riskProfileUpdater, times(1)).updateRiskProfile(eq("user123"), eq(request), eq(false));
     }
 }

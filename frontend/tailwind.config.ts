@@ -1,8 +1,8 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: 'class',
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/features/**/*.{js,ts,jsx,tsx,mdx}",
@@ -43,7 +43,7 @@ const config: Config = {
         }
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Segoe UI", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)", "Segoe UI", "system-ui", "sans-serif"],
         mono: ["Consolas", "Monaco", "monospace"],
       },
     },

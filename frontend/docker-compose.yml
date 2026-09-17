@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  sentinelx-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinelx-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+      - NODE_ENV=production
+    restart: unless-stopped
